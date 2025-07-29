@@ -69,42 +69,73 @@ class BilingualTranslationService:
             'aaj', 'udya', 'kal', 'sandhya', 'ratri', 'sakal', 'dupari',
             'tumi', 'tumhi', 'mi', 'amhi', 'tyanche', 'tyachi', 'mala', 'tula',
             'aahe', 'aahet', 'aahat', 'navyane', 'juna', 'mottha', 'chota',
-            'ghara', 'ghar', 'gaon', 'shahar', 'rasta', 'dukan', 'school'
+            'ghara', 'ghar', 'gaon', 'shahar', 'rasta', 'dukan', 'school',
+            'nav', 'saathi', 'barobar', 'shivay', 'madhe', 'var', 'pasun',
+            'chya', 'pudhe', 'maghe', 'varti', 'khali', 'jevan', 'kaam'
         ]
         
-        text_lower = text.lower()
-        marathi_word_count = 0
-        words = text_lower.split()
+        # Marathi phrases that are strong indicators
+        marathi_phrases = [
+            'tumhi kasa ahat', 'tumhi kase ahat', 'kasa ahat', 'kase ahat',
+            'majhe nav', 'maza nav', 'tumche nav', 'dhanyawad tumhi',
+            'namaskar tumhi', 'maaf kara', 'krupa kara'
+        ]
         
+        text_lower = text.lower().strip()
+        words = text_lower.split()
+        marathi_word_count = 0
+        
+        # Check for Marathi phrases first (stronger indicators)
+        for phrase in marathi_phrases:
+            if phrase in text_lower:
+                logger.info(f"Found Marathi phrase: {phrase}")
+                return 'mr'
+        
+        # Check for exact Marathi words and partial matches
         for word in marathi_words:
             if word in text_lower:
                 marathi_word_count += 1
                 logger.info(f"Found Marathi word: {word}")
         
-        # If more than 30% of recognizable words are Marathi, classify as Marathi
-        if marathi_word_count > 0 and len(words) > 0:
-            marathi_ratio = marathi_word_count / len(words)
-            if marathi_ratio >= 0.3 or marathi_word_count >= 2:
-                logger.info(f"Detected Marathi (romanized words: {marathi_word_count}/{len(words)})")
+        # More aggressive Marathi detection for single words
+        if len(words) == 1:
+            if text_lower in marathi_words:
+                logger.info(f"Single Marathi word detected: {text_lower}")
                 return 'mr'
         
-        # English detection
-        english_pattern = re.compile(r'^[a-zA-Z\s.,!?\'"-]+$')
-        if english_pattern.match(text.strip()):
-            logger.info("Detected English")
-            return 'en'
+        # Check for multi-word Marathi phrases
+        if len(words) >= 2:
+            # If more than 15% of recognizable words are Marathi, classify as Marathi
+            if marathi_word_count > 0 and len(words) > 0:
+                marathi_ratio = marathi_word_count / len(words)
+                if marathi_ratio >= 0.15 or marathi_word_count >= 1:  # Even lower threshold for phrases
+                    logger.info(f"Detected Marathi phrase (romanized words: {marathi_word_count}/{len(words)})")
+                    return 'mr'
+        else:
+            # For single words, be more lenient
+            if marathi_word_count >= 1:
+                logger.info(f"Detected single Marathi word")
+                return 'mr'
         
         # Check for common English words
         english_words = ['hello', 'hi', 'how', 'are', 'you', 'what', 'where', 'thank', 'please', 
-                        'yes', 'no', 'sorry', 'good', 'morning', 'evening', 'night', 'name', 'nice']
+                        'yes', 'no', 'sorry', 'good', 'morning', 'evening', 'night', 'name', 'nice', 'today', 'tomorrow']
         english_word_count = 0
         
         for word in english_words:
             if word in text_lower:
                 english_word_count += 1
+                logger.info(f"Found English word: {word}")
         
-        if english_word_count > marathi_word_count:
+        # English detection with better logic
+        if english_word_count > 0:
             logger.info(f"Detected English (common words: {english_word_count})")
+            return 'en'
+        
+        # English pattern check (after word-based detection)
+        english_pattern = re.compile(r'^[a-zA-Z\s.,!?\'"-]+$')
+        if english_pattern.match(text.strip()):
+            logger.info("Detected English (pattern match)")
             return 'en'
         
         # Default to English if uncertain
@@ -119,6 +150,10 @@ class BilingualTranslationService:
             'majhe nav': 'माझे नाव',
             'maza nav': 'माझं नाव',
             'tumche nav': 'तुमचं नाव',
+            'tumhi kasa ahat': 'तुम्ही कसे आहात',
+            'tumhi kase ahat': 'तुम्ही कसे आहात',
+            'kasa ahat': 'कसे आहात',
+            'kase ahat': 'कसे आहात',
             'aahe': 'आहे',
             'ahe': 'आहे',
             'ahat': 'आहात',
@@ -139,11 +174,25 @@ class BilingualTranslationService:
             'mitra': 'मित्र',
             'engineer': 'अभियंता',
             'doctor': 'डॉक्टर',
-            'teacher': 'शिक्षक'
+            'teacher': 'शिक्षक',
+            'tumhi': 'तुम्ही',
+            'mi': 'मी',
+            'amhi': 'आम्ही',
+            'te': 'ते',
+            'mala': 'मला',
+            'tula': 'तुला',
+            'hoye': 'होय',
+            'nahi': 'नाही',
+            'aaj': 'आज',
+            'udya': 'उद्या',
+            'kal': 'काल'
         }
         
         converted_text = text.lower()
-        for roman, devanagari in romanized_to_devanagari_map.items():
+        # Sort by length (longest first) to handle longer phrases first
+        sorted_map = sorted(romanized_to_devanagari_map.items(), key=lambda x: len(x[0]), reverse=True)
+        
+        for roman, devanagari in sorted_map:
             converted_text = converted_text.replace(roman, devanagari)
         
         return converted_text
@@ -445,6 +494,8 @@ class BilingualTranslationService:
             'kasa ahat': 'how are you',
             'kasa ahes': 'how are you',
             'kasa kay': 'how are you',
+            'tumhi kasa ahat': 'how are you',
+            'tumhi kase ahat': 'how are you',
             'tumche nav kay ahe': 'what is your name',
             'majhe nav': 'my name is',
             'maza nav': 'my name is',
@@ -455,6 +506,7 @@ class BilingualTranslationService:
             'kuthe': 'where',
             'kay': 'what',
             'kasa': 'how',
+            'kase': 'how',
             'hoye': 'yes',
             'hoy': 'yes',
             'nahi': 'no',
@@ -479,7 +531,30 @@ class BilingualTranslationService:
             'aai': 'mother',
             'baba': 'father',
             'bhau': 'brother',
-            'bahin': 'sister'
+            'bahin': 'sister',
+            'tumhi': 'you',
+            'mi': 'I',
+            'amhi': 'we',
+            'te': 'they',
+            'tyanche': 'their',
+            'tyachi': 'his/her',
+            'mala': 'to me',
+            'tula': 'to you',
+            'aahe': 'is',
+            'ahe': 'is',
+            'ahat': 'are',
+            'ahes': 'are',
+            'chya': 'of',
+            'madhe': 'in',
+            'var': 'on',
+            'pasun': 'from',
+            'saathi': 'for',
+            'barobar': 'with',
+            'shivay': 'without',
+            'pudhe': 'ahead',
+            'maghe': 'behind',
+            'varti': 'above',
+            'khali': 'below'
         }
         
         # English to romanized Marathi  
@@ -545,22 +620,38 @@ class BilingualTranslationService:
                 if mar_phrase in text:
                     return eng_phrase
             
-            # Try partial matches for romanized
-            for rom_phrase, eng_phrase in romanized_mr_to_en.items():
+            # Try partial matches for romanized (longer phrases first)
+            sorted_romanized = sorted(romanized_mr_to_en.items(), key=lambda x: len(x[0]), reverse=True)
+            for rom_phrase, eng_phrase in sorted_romanized:
                 if rom_phrase in text_lower:
                     return eng_phrase
-                    
+            
             # Try word-by-word translation for romanized Marathi
             words = text_lower.split()
             translated_words = []
+            found_translations = 0
+            
             for word in words:
                 if word in romanized_mr_to_en:
                     translated_words.append(romanized_mr_to_en[word])
+                    found_translations += 1
                 else:
-                    translated_words.append(word)  # Keep untranslated word
+                    # Try partial matching for compound words
+                    found_partial = False
+                    for rom_word, eng_word in romanized_mr_to_en.items():
+                        if word in rom_word or rom_word in word:
+                            translated_words.append(eng_word)
+                            found_partial = True
+                            found_translations += 1
+                            break
+                    if not found_partial:
+                        translated_words.append(word)  # Keep untranslated word
             
-            if len(translated_words) > 0 and any(w in romanized_mr_to_en.values() for w in translated_words):
-                return ' '.join(translated_words)
+            # Return translation if we found at least one known word
+            if found_translations > 0:
+                result = ' '.join(translated_words)
+                logger.info(f"Word-by-word translation: {text} -> {result} ({found_translations} words translated)")
+                return result
                 
         elif source_lang == 'en' and target_lang == 'mr':
             # English to Marathi - try Devanagari first, then romanized fallback
@@ -595,50 +686,59 @@ class BilingualTranslationService:
     async def translate(self, text: str, source_lang: str = "auto", target_lang: str = "auto") -> dict:
         """Main translation function with auto-detection and multiple fallbacks"""
         try:
+            # Clean input text
+            text = text.strip()
+            if not text:
+                raise ValueError("Empty text provided")
+            
             # Auto-detect source language if needed
             if source_lang == "auto" or source_lang == "English":
                 detected_lang = self.detect_language(text)
             else:
                 detected_lang = 'mr' if source_lang == "Marathi" else 'en'
             
-            # Auto-determine target language
+            # Auto-determine target language (always opposite of source)
             if target_lang == "auto" or target_lang == "English" or target_lang == "Marathi":
                 auto_target = 'en' if detected_lang == 'mr' else 'mr'
             else:
                 auto_target = 'mr' if target_lang == "Marathi" else 'en'
             
-            logger.info(f"Translation: {detected_lang} -> {auto_target} for '{text}'")
+            logger.info(f"Translation: '{text}' from {detected_lang} to {auto_target}")
             
             # Check cache first
-            cache_key = f"{text}_{detected_lang}_{auto_target}"
+            cache_key = f"{text.lower()}_{detected_lang}_{auto_target}"
             if cache_key in self.translation_cache:
                 logger.info("Using cached translation")
+                cached_result = self.translation_cache[cache_key]
                 return {
-                    'translated_text': self.translation_cache[cache_key],
+                    'translated_text': cached_result,
                     'source_language': detected_lang,
                     'target_language': auto_target,
                     'method': 'cache'
                 }
             
             # Try dictionary first for better Marathi accuracy
-            translation = self.translate_with_dictionary(text, detected_lang, auto_target)
+            dictionary_translation = self.translate_with_dictionary(text, detected_lang, auto_target)
             
-            if translation and len(translation.split()) >= len(text.split()) * 0.6:
-                # Dictionary gave a good translation (covers at least 60% of words)
-                self.translation_cache[cache_key] = translation
+            if dictionary_translation:
+                # Dictionary gave a translation, use it
+                self.translation_cache[cache_key] = dictionary_translation
+                logger.info(f"Dictionary translation successful: {dictionary_translation}")
                 return {
-                    'translated_text': translation,
+                    'translated_text': dictionary_translation,
                     'source_language': detected_lang,
                     'target_language': auto_target,
                     'method': 'dictionary'
                 }
             
-            # Fallback to multiple free APIs for longer sentences or incomplete dictionary translations
+            # Fallback to multiple free APIs for phrases not in dictionary
+            logger.info("Dictionary translation not found, trying API fallbacks...")
             
             # Try MyMemory API first
             mymemory_translation = self.translate_with_mymemory(text, detected_lang, auto_target)
-            if mymemory_translation:
+            if mymemory_translation and mymemory_translation.lower().strip() != text.lower().strip():
                 self.translation_cache[cache_key] = mymemory_translation
+                logger.info(f"MyMemory translation successful: {mymemory_translation}")
                 return {
                     'translated_text': mymemory_translation,
                     'source_language': detected_lang,
@@ -648,8 +748,9 @@ class BilingualTranslationService:
             
             # Try Google Translate (free) as second option
             google_translation = self.translate_with_google_free(text, detected_lang, auto_target)
-            if google_translation:
+            if google_translation and google_translation.lower().strip() != text.lower().strip():
                 self.translation_cache[cache_key] = google_translation
+                logger.info(f"Google Translate successful: {google_translation}")
                 return {
                     'translated_text': google_translation,
                     'source_language': detected_lang,
@@ -659,8 +760,9 @@ class BilingualTranslationService:
             
             # Try Lingva Translate as third option
             lingva_translation = self.translate_with_lingva(text, detected_lang, auto_target)
-            if lingva_translation:
+            if lingva_translation and lingva_translation.lower().strip() != text.lower().strip():
                 self.translation_cache[cache_key] = lingva_translation
+                logger.info(f"Lingva Translate successful: {lingva_translation}")
                 return {
                     'translated_text': lingva_translation,
                     'source_language': detected_lang,
@@ -670,8 +772,9 @@ class BilingualTranslationService:
             
             # Try LibreTranslate as fourth option
             libre_translation = self.translate_with_libre(text, detected_lang, auto_target)
-            if libre_translation:
+            if libre_translation and libre_translation.lower().strip() != text.lower().strip():
                 self.translation_cache[cache_key] = libre_translation
+                logger.info(f"LibreTranslate successful: {libre_translation}")
                 return {
                     'translated_text': libre_translation,
                     'source_language': detected_lang,
@@ -679,19 +782,12 @@ class BilingualTranslationService:
                     'method': 'libretranslate'
                 }
             
-            # Use dictionary translation even if incomplete
-            if translation:
-                self.translation_cache[cache_key] = translation
-                return {
-                    'translated_text': translation,
-                    'source_language': detected_lang,
-                    'target_language': auto_target,
-                    'method': 'dictionary_partial'
-                }
+            # If all APIs fail, provide a helpful fallback message
+            fallback_msg = f"Translation not available for '{text}'. Try common phrases like 'hello', 'thank you', 'namaskar', or 'dhanyawad'."
+            logger.warning(f"All translation methods failed for: {text}")
             
-            # If all else fails, return a helpful message
             return {
-                'translated_text': f"Translation not available for '{text}'. Try simpler phrases like 'hello', 'thank you', or 'नमस्कार', 'धन्यवाद'.",
+                'translated_text': fallback_msg,
                 'source_language': detected_lang,
                 'target_language': auto_target,
                 'method': 'fallback_message'
