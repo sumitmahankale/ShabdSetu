@@ -1,28 +1,52 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Languages, ArrowRight, Copy, RefreshCw, Volume2, Heart, Github, Mic, MicOff, VolumeX } from 'lucide-react';
+import { Languages, ArrowRight, Copy, RefreshCw, Volume2, Heart, Github, Mic, MicOff, VolumeX, Sparkles, RotateCcw } from 'lucide-react';
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000';
 
-// Free translation using Google Translate (unofficial)
-const translateWithFreeService = async (text, fromLang = 'en', toLang = 'mr') => {
+// Language detection function
+const detectLanguage = (text) => {
+  // Simple language detection based on script
+  const marathiPattern = /[\u0900-\u097F]/; // Devanagari script
+  const englishPattern = /^[a-zA-Z\s.,!?'"()-]+$/;
+  
+  if (marathiPattern.test(text)) {
+    return 'mr'; // Marathi
+  } else if (englishPattern.test(text.trim())) {
+    return 'en'; // English
+  }
+  
+  // Default to English if uncertain
+  return 'en';
+};
+
+// Free translation with bidirectional support
+const translateWithFreeService = async (text, fromLang = null, toLang = null) => {
   try {
+    // Auto-detect language if not provided
+    const detectedLang = fromLang || detectLanguage(text);
+    const targetLang = toLang || (detectedLang === 'en' ? 'mr' : 'en');
+    
     // Using a free translation API (MyMemory)
     const response = await axios.get(`https://api.mymemory.translated.net/get`, {
       params: {
         q: text,
-        langpair: `${fromLang}|${toLang}`
+        langpair: `${detectedLang}|${targetLang}`
       }
     });
     
     if (response.data && response.data.responseData && response.data.responseData.translatedText) {
-      return response.data.responseData.translatedText;
+      return {
+        translatedText: response.data.responseData.translatedText,
+        detectedLanguage: detectedLang,
+        targetLanguage: targetLang
+      };
     } else {
       throw new Error('Translation failed');
     }
   } catch (error) {
-    // Fallback: Simple word-by-word translation for common phrases
-    const commonTranslations = {
+    // Fallback: Bidirectional phrase dictionary
+    const englishToMarathi = {
       'hello': 'नमस्कार',
       'how are you': 'तुम्ही कसे आहात',
       'good morning': 'सुप्रभात',
@@ -47,10 +71,33 @@ const translateWithFreeService = async (text, fromLang = 'en', toLang = 'mr') =>
       'yesterday': 'काल'
     };
     
+    // Create reverse mapping for Marathi to English
+    const marathiToEnglish = Object.fromEntries(
+      Object.entries(englishToMarathi).map(([en, mr]) => [mr, en])
+    );
+    
     const lowerText = text.toLowerCase();
-    for (const [english, marathi] of Object.entries(commonTranslations)) {
-      if (lowerText.includes(english)) {
-        return marathi;
+    const detectedLang = detectLanguage(text);
+    
+    if (detectedLang === 'en') {
+      for (const [english, marathi] of Object.entries(englishToMarathi)) {
+        if (lowerText.includes(english)) {
+          return {
+            translatedText: marathi,
+            detectedLanguage: 'en',
+            targetLanguage: 'mr'
+          };
+        }
+      }
+    } else {
+      for (const [marathi, english] of Object.entries(marathiToEnglish)) {
+        if (text.includes(marathi)) {
+          return {
+            translatedText: english,
+            detectedLanguage: 'mr',
+            targetLanguage: 'en'
+          };
+        }
       }
     }
     
@@ -63,29 +110,15 @@ function App() {
   const [translatedText, setTranslatedText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [copied, setCopied] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
-  const [autoSpeak, setAutoSpeak] = useState(true);
-  const textareaRef = useRef(null);
+  const [detectedLanguage, setDetectedLanguage] = useState('');
+  const [targetLanguage, setTargetLanguage] = useState('');
+  const [conversationHistory, setConversationHistory] = useState([]);
   const recognitionRef = useRef(null);
 
-  // Sample texts for quick testing
-  const sampleTexts = [
-    "Hello, how are you?",
-    "Good morning! Have a great day.",
-    "Thank you for your help.",
-    "What is your name?",
-    "Nice to meet you.",
-    "How much does this cost?",
-    "Where is the bathroom?",
-    "I need help.",
-    "Excuse me, please.",
-    "See you later, goodbye."
-  ];
-
-  // Initialize speech recognition
+  // Initialize speech recognition with bidirectional support
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       setSpeechSupported(true);
@@ -94,7 +127,7 @@ function App() {
       
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'en-US';
+      recognitionRef.current.lang = 'en-US'; // Will be changed dynamically
       
       recognitionRef.current.onstart = () => {
         setIsListening(true);
@@ -125,6 +158,8 @@ function App() {
   const startListening = () => {
     if (recognitionRef.current && speechSupported) {
       try {
+        // Set recognition language to auto-detect (start with English, can be changed)
+        recognitionRef.current.lang = 'en-US';
         recognitionRef.current.start();
       } catch (error) {
         setError('Could not start speech recognition. Please try again.');
@@ -142,7 +177,7 @@ function App() {
   const translateText = async (textToTranslate = null) => {
     const text = textToTranslate || inputText;
     if (!text.trim()) {
-      setError('Please enter some text to translate or use voice input');
+      setError('Please speak something or enter text to translate');
       return;
     }
 
@@ -150,58 +185,34 @@ function App() {
     setError('');
     
     try {
-      // Try free translation service first
-      let translated;
-      try {
-        translated = await translateWithFreeService(text, 'en', 'mr');
-      } catch (freeServiceError) {
-        // If free service fails, try the backend as fallback
-        const response = await axios.post(`${API_BASE_URL}/translate`, {
-          text: text,
-          source_language: "English",
-          target_language: "Marathi"
-        });
-        translated = response.data.translated_text;
-      }
+      // Use free translation service with auto-detection
+      const result = await translateWithFreeService(text);
       
-      setTranslatedText(translated);
+      setTranslatedText(result.translatedText);
+      setDetectedLanguage(result.detectedLanguage);
+      setTargetLanguage(result.targetLanguage);
       
-      // Auto-speak the translation if enabled
-      if (autoSpeak) {
-        setTimeout(() => {
-          speakText(translated, 'marathi');
-        }, 500);
-      }
+      // Add to conversation history
+      const newEntry = {
+        id: Date.now(),
+        input: text,
+        output: result.translatedText,
+        inputLang: result.detectedLanguage,
+        outputLang: result.targetLanguage,
+        timestamp: new Date().toLocaleTimeString()
+      };
+      setConversationHistory(prev => [newEntry, ...prev.slice(0, 4)]); // Keep last 5 entries
+      
+      // Auto-speak the translation
+      setTimeout(() => {
+        speakText(result.translatedText, result.targetLanguage);
+      }, 500);
     } catch (err) {
       console.error('Translation error:', err);
-      setError('Translation failed. This could be due to: 1) No internet connection 2) Backend API key not configured 3) Service temporarily unavailable. Please try again or use the sample phrases.');
+      setError('Translation failed. Please try again or check your internet connection.');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const copyToClipboard = async () => {
-    if (translatedText) {
-      try {
-        await navigator.clipboard.writeText(translatedText);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      } catch (err) {
-        console.error('Failed to copy text:', err);
-      }
-    }
-  };
-
-  const clearAll = () => {
-    setInputText('');
-    setTranslatedText('');
-    setError('');
-    textareaRef.current?.focus();
-  };
-
-  const useSampleText = (text) => {
-    setInputText(text);
-    setError('');
   };
 
   const speakText = (text, lang = 'en') => {
@@ -212,8 +223,8 @@ function App() {
       setIsSpeaking(true);
       const utterance = new SpeechSynthesisUtterance(text);
       
-      // Configure voice settings
-      if (lang === 'marathi') {
+      // Configure voice settings based on language
+      if (lang === 'mr') {
         utterance.lang = 'hi-IN'; // Hindi voice for Marathi (closest available)
         utterance.rate = 0.7;
         utterance.pitch = 1.0;
@@ -245,370 +256,304 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    // Auto-focus on input when component mounts
-    textareaRef.current?.focus();
-  }, []);
+  const clearAll = () => {
+    setInputText('');
+    setTranslatedText('');
+    setError('');
+    setDetectedLanguage('');
+    setTargetLanguage('');
+    setConversationHistory([]);
+  };
+
+  const getLanguageDisplayName = (langCode) => {
+    const languages = {
+      'en': 'English',
+      'mr': 'मराठी (Marathi)'
+    };
+    return languages[langCode] || langCode;
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-6xl mx-auto px-4 py-4">
+      <header className="bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg">
+              <div className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl shadow-lg">
                 <Languages className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">ShabdSetu</h1>
-                <p className="text-sm text-gray-600">शब्दसेतू - Bridge of Words</p>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  ShabdSetu
+                </h1>
+                <p className="text-sm text-gray-600">शब्दसेतू - AI Translation</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                English → मराठी
+            <div className="flex items-center gap-3">
+              <span className="px-3 py-1 bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 rounded-full text-sm font-medium shadow-sm">
+                🔄 Auto-detect
               </span>
-              <a 
-                href="https://github.com/sumitmahankale/ShabdSetu" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="p-2 text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <Github className="w-5 h-5" />
-              </a>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        {/* Hero Section */}
+      <main className="max-w-4xl mx-auto px-6 py-8">
+        {/* Central Voice Interface - Gemini Style */}
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">
-            English to Marathi Translation
-          </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-4">
-            Powered by AI for accurate, context-aware translations between English and Marathi
-          </p>
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 max-w-2xl mx-auto">
-            <p className="text-green-800 text-sm">
-              ✅ <strong>Free Translation Service:</strong> No API key required! Uses free translation services and offline word database for common phrases.
-            </p>
-          </div>
-        </div>
-
-        {/* Voice-to-Voice Translation Section */}
-        <div className="mb-8 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-6 border border-purple-200">
-          <div className="text-center mb-6">
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">🎤 Voice-to-Voice Translation</h3>
-            <p className="text-gray-600">Speak in English and hear the translation in Marathi</p>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/60 backdrop-blur-sm rounded-full border border-gray-200 shadow-sm mb-6">
+            <Sparkles className="w-4 h-4 text-purple-600" />
+            <span className="text-sm font-medium text-gray-700">Speak in any language</span>
           </div>
           
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            {/* Voice Input Button */}
-            <div className="flex flex-col items-center">
-              <button
-                onClick={isListening ? stopListening : startListening}
-                disabled={!speechSupported || isLoading}
-                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
-                  isListening 
-                    ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
-                    : 'bg-green-500 hover:bg-green-600'
-                } text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed`}
-                title={isListening ? 'Stop listening' : 'Start voice input'}
-              >
-                {isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
-              </button>
-              <span className="text-sm text-gray-600 mt-2">
-                {isListening ? 'Listening...' : 'Speak English'}
-              </span>
-            </div>
+          <h2 className="text-4xl font-bold text-gray-900 mb-3">
+            Start Talking
+          </h2>
+          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+            Speak in English or Marathi and get instant translation with voice response
+          </p>
 
-            {/* Arrow */}
-            <ArrowRight className="w-8 h-8 text-purple-600 transform rotate-0 sm:rotate-0" />
-
-            {/* Voice Output Control */}
-            <div className="flex flex-col items-center">
-              <button
-                onClick={isSpeaking ? stopSpeaking : () => speakText(translatedText, 'marathi')}
-                disabled={!translatedText || isLoading}
-                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 ${
-                  isSpeaking 
-                    ? 'bg-orange-500 hover:bg-orange-600 animate-pulse' 
-                    : 'bg-blue-500 hover:bg-blue-600'
-                } text-white shadow-lg disabled:opacity-50 disabled:cursor-not-allowed`}
-                title={isSpeaking ? 'Stop speaking' : 'Hear Marathi translation'}
-              >
-                {isSpeaking ? <VolumeX className="w-8 h-8" /> : <Volume2 className="w-8 h-8" />}
-              </button>
-              <span className="text-sm text-gray-600 mt-2">
-                {isSpeaking ? 'Speaking...' : 'Hear Marathi'}
-              </span>
+          {/* Main Voice Button - Gemini Style */}
+          <div className="relative mb-8">
+            <button
+              onClick={isListening ? stopListening : startListening}
+              disabled={!speechSupported || isLoading}
+              className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 shadow-2xl ${
+                isListening 
+                  ? 'bg-gradient-to-r from-red-500 to-pink-500 scale-110 animate-pulse' 
+                  : isSpeaking
+                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 scale-105 animate-pulse'
+                  : isLoading
+                  ? 'bg-gradient-to-r from-blue-500 to-purple-500 animate-spin'
+                  : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:scale-105'
+              } text-white disabled:opacity-50 disabled:cursor-not-allowed`}
+              title={isListening ? 'Stop listening' : 'Start voice translation'}
+            >
+              {isListening ? (
+                <MicOff className="w-10 h-10" />
+              ) : isSpeaking ? (
+                <Volume2 className="w-10 h-10" />
+              ) : isLoading ? (
+                <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <Mic className="w-10 h-10" />
+              )}
+              
+              {/* Animated Ring */}
+              {(isListening || isSpeaking) && (
+                <div className="absolute inset-0 rounded-full border-4 border-white/30 animate-ping"></div>
+              )}
+            </button>
+            
+            {/* Status Text */}
+            <div className="mt-4">
+              {isListening && (
+                <p className="text-red-600 font-medium animate-pulse">🎤 Listening...</p>
+              )}
+              {isSpeaking && (
+                <p className="text-orange-600 font-medium animate-pulse">🔊 Speaking...</p>
+              )}
+              {isLoading && (
+                <p className="text-blue-600 font-medium">🔄 Translating...</p>
+              )}
+              {!isListening && !isSpeaking && !isLoading && (
+                <p className="text-gray-600">Tap to start speaking</p>
+              )}
             </div>
           </div>
 
-          {/* Auto-speak toggle */}
-          <div className="flex items-center justify-center mt-6">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={autoSpeak}
-                onChange={(e) => setAutoSpeak(e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700">Auto-speak translations</span>
-            </label>
-          </div>
+          {/* Language Detection Display */}
+          {detectedLanguage && targetLanguage && (
+            <div className="flex items-center justify-center gap-4 mb-8">
+              <div className="px-4 py-2 bg-white rounded-lg shadow-sm border border-gray-200">
+                <span className="text-sm font-medium text-gray-700">
+                  {getLanguageDisplayName(detectedLanguage)}
+                </span>
+              </div>
+              <ArrowRight className="w-5 h-5 text-gray-400" />
+              <div className="px-4 py-2 bg-white rounded-lg shadow-sm border border-gray-200">
+                <span className="text-sm font-medium text-gray-700">
+                  {getLanguageDisplayName(targetLanguage)}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Speech support warning */}
           {!speechSupported && (
-            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-yellow-800 text-sm text-center">
-                ⚠️ Voice recognition is not supported in your browser. Please use Chrome, Edge, or Safari for the best experience.
+            <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl max-w-md mx-auto">
+              <p className="text-amber-800 text-sm">
+                ⚠️ Voice recognition not supported. Please use Chrome, Edge, or Safari.
               </p>
             </div>
           )}
         </div>
 
-        {/* Sample Texts */}
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Quick Start - Try these examples:</h3>
-          <div className="flex flex-wrap gap-2">
-            {sampleTexts.map((text, index) => (
-              <button
-                key={index}
-                onClick={() => useSampleText(text)}
-                className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-lg text-sm transition-colors"
-              >
-                {text}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Translation Interface */}
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Input Section */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-                <h3 className="text-lg font-semibold text-gray-900">English</h3>
-                {isListening && (
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                    <span className="text-sm text-red-600 font-medium">Listening...</span>
-                  </div>
-                )}
+        {/* Current Translation Display */}
+        {(inputText || translatedText || error) && (
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 mb-8">
+            {error ? (
+              <div className="text-center">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-red-600 text-2xl">⚠️</span>
+                </div>
+                <p className="text-red-600 font-medium mb-2">Translation Error</p>
+                <p className="text-red-500 text-sm">{error}</p>
               </div>
-              <div className="flex gap-2">
-                {speechSupported && (
-                  <button
-                    onClick={isListening ? stopListening : startListening}
-                    disabled={isLoading}
-                    className={`p-2 rounded-lg transition-colors ${
-                      isListening 
-                        ? 'bg-red-100 text-red-600 hover:bg-red-200' 
-                        : 'bg-green-100 text-green-600 hover:bg-green-200'
-                    } disabled:opacity-50`}
-                    title={isListening ? 'Stop voice input' : 'Start voice input'}
-                  >
-                    {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                  </button>
-                )}
+            ) : (
+              <div className="space-y-6">
                 {inputText && (
-                  <button
-                    onClick={() => speakText(inputText, 'en')}
-                    className="p-2 text-gray-500 hover:text-blue-600 transition-colors"
-                    title="Listen to English text"
-                  >
-                    <Volume2 className="w-4 h-4" />
-                  </button>
+                  <div className="text-center">
+                    <div className="text-sm text-gray-500 mb-2">You said:</div>
+                    <p className="text-lg text-gray-900 font-medium">{inputText}</p>
+                    {detectedLanguage && (
+                      <div className="mt-2">
+                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
+                          {getLanguageDisplayName(detectedLanguage)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 )}
-              </div>
-            </div>
-            
-            <textarea
-              ref={textareaRef}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="Enter English text to translate to Marathi..."
-              className="textarea-custom h-40"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && e.ctrlKey) {
-                  translateText();
-                }
-              }}
-            />
-            
-            <div className="flex items-center justify-between mt-4">
-              <span className="text-sm text-gray-500">
-                {inputText.length} characters
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={clearAll}
-                  className="btn-secondary"
-                  disabled={!inputText}
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Clear
-                </button>
-                <button
-                  onClick={translateText}
-                  disabled={isLoading || !inputText.trim()}
-                  className="btn-primary"
-                >
-                  {isLoading ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Translating...
-                    </>
-                  ) : (
-                    <>
-                      <ArrowRight className="w-4 h-4" />
-                      Translate
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Output Section */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 bg-orange-500 rounded-full"></div>
-                <h3 className="text-lg font-semibold text-gray-900">मराठी (Marathi)</h3>
-                {isSpeaking && (
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-                    <span className="text-sm text-orange-600 font-medium">Speaking...</span>
+                
+                {translatedText && (
+                  <div className="text-center border-t border-gray-100 pt-6">
+                    <div className="text-sm text-gray-500 mb-2">Translation:</div>
+                    <p className="text-xl text-gray-900 font-semibold mb-4">{translatedText}</p>
+                    {targetLanguage && (
+                      <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">
+                        {getLanguageDisplayName(targetLanguage)}
+                      </span>
+                    )}
+                    
+                    {/* Action Buttons */}
+                    <div className="flex items-center justify-center gap-3 mt-4">
+                      <button
+                        onClick={() => speakText(translatedText, targetLanguage)}
+                        className="p-2 text-gray-500 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50"
+                        title="Listen to translation"
+                      >
+                        <Volume2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(translatedText)}
+                        className="p-2 text-gray-500 hover:text-green-600 transition-colors rounded-lg hover:bg-green-50"
+                        title="Copy translation"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
-              {translatedText && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={isSpeaking ? stopSpeaking : () => speakText(translatedText, 'marathi')}
-                    className={`p-2 transition-colors ${
-                      isSpeaking 
-                        ? 'bg-orange-100 text-orange-600 hover:bg-orange-200' 
-                        : 'text-gray-500 hover:text-orange-600'
-                    }`}
-                    title={isSpeaking ? 'Stop speaking' : 'Listen to Marathi text'}
-                  >
-                    {isSpeaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                  </button>
-                  <button
-                    onClick={copyToClipboard}
-                    className="p-2 text-gray-500 hover:text-green-600 transition-colors"
-                    title="Copy translated text"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
+            )}
+          </div>
+        )}
+
+        {/* Conversation History */}
+        {conversationHistory.length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Recent Translations</h3>
+              <button
+                onClick={clearAll}
+                className="text-sm text-gray-500 hover:text-red-600 transition-colors flex items-center gap-1"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Clear all
+              </button>
             </div>
-            
-            <div className="h-40 p-4 border border-gray-300 rounded-lg bg-gray-50 overflow-y-auto">
-              {error ? (
-                <div className="text-red-600 bg-red-50 p-3 rounded-lg border border-red-200">
-                  <p className="font-medium">Translation Error</p>
-                  <p className="text-sm mt-1">{error}</p>
+            <div className="space-y-3">
+              {conversationHistory.map((entry) => (
+                <div key={entry.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded-full">
+                          {getLanguageDisplayName(entry.inputLang)}
+                        </span>
+                        <ArrowRight className="w-3 h-3 text-gray-400" />
+                        <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded-full">
+                          {getLanguageDisplayName(entry.outputLang)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-1">{entry.input}</p>
+                      <p className="text-sm text-gray-900 font-medium">{entry.output}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => speakText(entry.output, entry.outputLang)}
+                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                      >
+                        <Volume2 className="w-3 h-3" />
+                      </button>
+                      <span className="text-xs text-gray-400">{entry.timestamp}</span>
+                    </div>
+                  </div>
                 </div>
-              ) : translatedText ? (
-                <p className="marathi-text text-gray-900">{translatedText}</p>
-              ) : (
-                <p className="text-gray-500 italic">
-                  Translated text will appear here...
-                </p>
-              )}
-            </div>
-            
-            <div className="flex items-center justify-between mt-4">
-              <span className="text-sm text-gray-500">
-                {translatedText.length} characters
-              </span>
-              {copied && (
-                <span className="text-sm text-green-600 font-medium">
-                  ✓ Copied to clipboard!
-                </span>
-              )}
+              ))}
             </div>
           </div>
-        </div>
+        )}
 
         {/* Features Section */}
-        <div className="mt-16 grid md:grid-cols-3 gap-8">
-          <div className="text-center p-6">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+        <div className="grid md:grid-cols-3 gap-6 mb-12">
+          <div className="text-center p-6 bg-white rounded-2xl shadow-sm border border-gray-200">
+            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-4">
               <Languages className="w-6 h-6 text-blue-600" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">AI-Powered</h3>
-            <p className="text-gray-600">Advanced language models ensure accurate and contextual translations</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Auto-Detect</h3>
+            <p className="text-gray-600 text-sm">Automatically detects whether you're speaking English or Marathi</p>
           </div>
           
-          <div className="text-center p-6">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-              <Heart className="w-6 h-6 text-green-600" />
+          <div className="text-center p-6 bg-white rounded-2xl shadow-sm border border-gray-200">
+            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+              <Volume2 className="w-6 h-6 text-green-600" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Cultural Context</h3>
-            <p className="text-gray-600">Preserves cultural nuances and context in translations</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Voice Response</h3>
+            <p className="text-gray-600 text-sm">Automatically speaks the translation in the target language</p>
           </div>
           
-          <div className="text-center p-6">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-              <RefreshCw className="w-6 h-6 text-purple-600" />
+          <div className="text-center p-6 bg-white rounded-2xl shadow-sm border border-gray-200">
+            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+              <Sparkles className="w-6 h-6 text-purple-600" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Real-time</h3>
-            <p className="text-gray-600">Fast, real-time translations with instant results</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Free & Fast</h3>
+            <p className="text-gray-600 text-sm">No API keys required, works instantly with free translation services</p>
           </div>
         </div>
 
-        {/* Usage Instructions */}
-        <div className="mt-16 bg-blue-50 rounded-xl p-8">
+        {/* How to Use */}
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-8 text-center">
           <h3 className="text-xl font-semibold text-gray-900 mb-4">How to Use</h3>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">🎤 Voice-to-Voice Translation</h4>
-              <p className="text-gray-600 text-sm">Click the microphone, speak in English, and hear Marathi translation automatically</p>
-            </div>
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">⌨️ Type & Translate</h4>
-              <p className="text-gray-600 text-sm">Type English text and click "Translate" or press Ctrl+Enter</p>
-            </div>
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">🔊 Audio Controls</h4>
-              <p className="text-gray-600 text-sm">Use speaker icons to hear pronunciation in both languages</p>
-            </div>
-            <div>
-              <h4 className="font-medium text-gray-900 mb-2">📋 Quick Actions</h4>
-              <p className="text-gray-600 text-sm">Copy translations, use sample texts, or clear all content</p>
-            </div>
-          </div>
-          
-          <div className="mt-6 p-4 bg-white rounded-lg border border-blue-200">
-            <h4 className="font-medium text-blue-900 mb-2">💡 Pro Tip</h4>
-            <p className="text-blue-800 text-sm">
-              Enable "Auto-speak translations" for fully hands-free experience. Just speak in English and listen to the Marathi translation!
+          <div className="max-w-2xl mx-auto space-y-3 text-gray-700">
+            <p className="flex items-center justify-center gap-2">
+              <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</span>
+              Tap the microphone button
+            </p>
+            <p className="flex items-center justify-center gap-2">
+              <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">2</span>
+              Speak in English or Marathi
+            </p>
+            <p className="flex items-center justify-center gap-2">
+              <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">3</span>
+              Listen to the automatic translation
             </p>
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="bg-gray-50 border-t mt-16">
-        <div className="max-w-6xl mx-auto px-4 py-8">
+      <footer className="bg-white/80 backdrop-blur-md border-t border-gray-200 mt-16">
+        <div className="max-w-4xl mx-auto px-6 py-8">
           <div className="text-center text-gray-600">
             <p className="mb-2">
-              Made with <Heart className="w-4 h-4 text-red-500 inline mx-1" /> for the Marathi community
+              Made with <Heart className="w-4 h-4 text-red-500 inline mx-1" /> for seamless communication
             </p>
             <p className="text-sm">
-              ShabdSetu - Building bridges between languages • Powered by LangChain & OpenAI
+              ShabdSetu - Bridging languages with AI • Powered by free translation services
             </p>
           </div>
         </div>
