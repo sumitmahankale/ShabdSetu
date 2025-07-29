@@ -1,262 +1,328 @@
 # ShabdSetu - शब्दसेतू
-## English to Marathi Translation Service
+## Bidirectional English-Marathi Speech Translator
 
-**ShabdSetu** (meaning "bridge of words" in Marathi) is a modern, AI-powered translation service that bridges the gap between English and Marathi languages. Built with cutting-edge technology, it provides accurate, context-aware translations with a beautiful user interface.
+**ShabdSetu** (meaning "bridge of words" in Marathi) is a comprehensive real-time speech-to-speech translation application that provides seamless bidirectional translation between English and Marathi with intelligent language detection and one-button operation.
 
-## 🌟 Features
+## Key Features
 
-### Backend (FastAPI + LangChain)
-- 🚀 **High-Performance API** built with FastAPI
-- 🤖 **AI-Powered Translations** using LangChain and OpenAI GPT models
-- 🔧 **Multiple LLM Support** (OpenAI, Ollama for local models)
-- 📖 **Context-Aware** translations that preserve meaning and cultural nuances
-- 🏥 **Health Monitoring** with comprehensive error handling
-- 📚 **Auto-Generated API Documentation** (Swagger/ReDoc)
+### Core Translation Capabilities
+- **Bidirectional Translation** - English to Marathi and Marathi to English
+- **Automatic Language Detection** - Detects input language automatically
+- **Multiple Input Formats** - Supports Devanagari script, romanized Marathi, and English text
+- **Real-Time Processing** - Instant translation with minimal latency
+- **Speech-to-Speech** - Complete voice input to voice output workflow
+
+### Advanced Translation Engine
+- **5 Free Translation APIs** with intelligent fallback system
+- **Dictionary-First Approach** for common phrases ensuring accuracy
+- **Romanized to Devanagari Conversion** for better API results
+- **Smart Caching System** for improved performance
+- **Comprehensive Phrase Coverage** for daily conversations
+
+### Modern User Interface
+- **Google Gemini-Style Design** with glassmorphic effects
+- **One-Touch Operation** - Single button for speech translation
+- **Visual Feedback** for recording, processing, and playback states
+- **Conversation History** with copy-to-clipboard functionality
+- **Debug Information Panel** for troubleshooting
+- **Mobile-Responsive Design** that works on all devices
+
+### Intelligent Voice Features
+- **Smart Voice Selection** - Chooses best available voice for target language
+- **Adjustable Speech Rate** - Slower rate for better pronunciation
+- **Cross-Platform Compatibility** - Works on desktop and mobile browsers
+- **Accessibility Support** - Keyboard navigation and screen reader friendly
+
+## Technology Stack
+
+### Backend (FastAPI)
+- **FastAPI** - High-performance async web framework
+- **Multiple Translation APIs** - MyMemory, Google Translate, Lingva, LibreTranslate
+- **Smart Language Detection** - Pattern matching and statistical analysis
+- **Comprehensive Error Handling** - Graceful fallbacks and detailed logging
+- **CORS-Enabled** - Seamless frontend-backend communication
 
 ### Frontend (React + Vite)
-- 🎨 **Modern UI** with responsive design using Tailwind CSS
-- 🎤 **Speech-to-Speech Translation** - speak English, hear Marathi
-- ⚡ **Real-Time Translation** interface with instant results
-- 🔊 **Voice Recognition** with automatic transcription
-- 📢 **Text-to-Speech** support for both English and Marathi
-- 📋 **Copy to Clipboard** functionality
-- 📱 **Mobile-Friendly** design that works on all devices
-- ♿ **Accessible** with keyboard navigation and screen reader support
-- 🎯 **Quick Samples** for easy testing
-- 🤖 **Auto-speak** translations for hands-free experience
+- **React 18** - Modern UI with hooks and context
+- **Vite** - Lightning-fast development and build tool
+- **Tailwind CSS** - Utility-first styling with custom components
+- **Web Speech API** - Native browser speech recognition
+- **Speech Synthesis API** - Text-to-speech with voice selection
+- **Axios** - HTTP client for API communication
 
-## 🏗️ Project Structure
+## Translation Services
 
-```
-ShabdSetu/
-├── Backend/                 # FastAPI backend service
-│   ├── main.py             # Main application file
-│   ├── requirements.txt    # Python dependencies
-│   ├── .env               # Environment variables
-│   ├── test_api.py        # API testing script
-│   └── README.md          # Backend documentation
-│
-├── Frontend/               # React frontend application
-│   ├── src/
-│   │   ├── App.jsx        # Main React component
-│   │   ├── main.jsx       # Entry point
-│   │   └── index.css      # Global styles
-│   ├── public/            # Static assets
-│   ├── package.json       # Node.js dependencies
-│   └── README.md          # Frontend documentation
-│
-└── README.md              # This file
-```
+The system uses multiple free translation services with intelligent fallback:
 
-## 🚀 Quick Start
+1. **Local Dictionary** - Instant translation for 100+ common phrases
+2. **MyMemory API** - Primary service with good Marathi support
+3. **Google Translate (Free)** - High-quality translations via unofficial API
+4. **Lingva Translate** - Privacy-focused Google Translate alternative
+5. **LibreTranslate** - Open-source translation service
+
+## Quick Start
 
 ### Prerequisites
-- **Python 3.8+** with pip
-- **Node.js 16+** with npm
-- **OpenAI API Key** (or Ollama for local models)
+- **Python 3.8+** and **Node.js 16+**
+- Modern web browser with microphone access
+- Internet connection for translation APIs
 
-### Backend Setup
+### 1. Backend Setup (Terminal 1)
+```bash
+cd Backend
+python -m venv venv
+# Windows
+venv\Scripts\activate
+# macOS/Linux
+source venv/bin/activate
 
-1. **Navigate to Backend directory:**
-   ```bash
-   cd Backend
-   ```
-
-2. **Create virtual environment:**
-   ```bash
-   python -m venv venv
-   source venv/Scripts/activate  # Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Configure environment:**
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your OpenAI API key
-   ```
-
-5. **Start the backend server:**
-   ```bash
-   python main.py
-   ```
-   Backend will be available at `http://localhost:8000`
-
-### Frontend Setup
-
-1. **Navigate to Frontend directory:**
-   ```bash
-   cd Frontend
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Start development server:**
-   ```bash
-   npm run dev
-   ```
-   Frontend will be available at `http://localhost:3000`
-
-## 🎤 Voice-to-Voice Translation
-
-ShabdSetu now supports complete **speech-to-speech translation**:
-
-### Quick Start with Voice
-1. **Open the app** at `http://localhost:3001`
-2. **Click the green microphone** button
-3. **Speak clearly in English** (e.g., "Hello, how are you?")
-4. **Listen automatically** to the Marathi translation
-5. **Enable auto-speak** for fully hands-free experience
-
-### Voice Features
-- 🎙️ **Speech Recognition** - converts your English speech to text
-- 🔄 **Auto-Translation** - translates immediately after recognition
-- 🔊 **Text-to-Speech** - speaks the Marathi translation aloud
-- 🤖 **Auto-Speak Mode** - completely hands-free operation
-- 📱 **Mobile Support** - works on smartphones and tablets
-
-### Browser Compatibility
-- ✅ **Chrome** (Recommended) - Full voice support
-- ✅ **Edge** - Full voice support  
-- ✅ **Safari** - Basic voice support
-- ⚠️ **Firefox** - Limited speech recognition
-
-## 🔧 Configuration
-
-### Backend Configuration (.env)
-```env
-OPENAI_API_KEY=your_openai_api_key_here
-MODEL_PROVIDER=openai
-MODEL_NAME=gpt-3.5-turbo
+pip install fastapi uvicorn python-dotenv requests
+python main.py
 ```
+Backend runs at: `http://localhost:8003`
 
-### Alternative: Local Models with Ollama
-```env
-MODEL_PROVIDER=ollama
-MODEL_NAME=llama2
+### 2. Frontend Setup (Terminal 2)
+```bash
+cd Frontend
+npm install
+npm run dev
 ```
+Frontend runs at: `http://localhost:3003`
 
-## 🌐 API Usage
+### 3. Using the Application
+1. Open `http://localhost:3003` in your browser
+2. Allow microphone permissions when prompted
+3. Click the microphone button to start
+4. Speak in English or Marathi
+5. Listen to the automatic translation
 
-### Translate Endpoint
+## Example Translations
+
+### English to Marathi
+- "Hello, how are you today?" → "नमस्कार, आज तुम्ही कसे आहात?"
+- "Thank you very much" → "खूप खूप धन्यवाद"
+- "I need help" → "मला मदत हवी"
+
+### Marathi to English (Romanized)
+- "namaskar majhe nav Sumit aahe" → "Hello, my name is Sumit"
+- "dhanyawad tumhi kasa ahat" → "Thank you, how are you"
+
+### Marathi to English (Devanagari)
+- "धन्यवाद" → "Thank you"
+- "नमस्कार" → "Hello"
+- "तुम्ही कसे आहात?" → "How are you?"
+
+## API Documentation
+
+### Translation Endpoint
 **POST** `/translate`
-
 ```json
 {
-  "text": "Hello, how are you?",
-  "source_language": "English",
-  "target_language": "Marathi"
+  "text": "Good morning, how is your day going?",
+  "source_lang": "auto",
+  "target_lang": "auto"
 }
 ```
 
 **Response:**
 ```json
 {
-  "original_text": "Hello, how are you?",
-  "translated_text": "नमस्कार, तुम्ही कसे आहात?",
-  "source_language": "English",
-  "target_language": "Marathi"
+  "original_text": "Good morning, how is your day going?",
+  "translated_text": "सुप्रभात, तुमचा दिवस कसा जात आहे?",
+  "source_language": "en",
+  "target_language": "mr",
+  "translation_method": "mymemory_api"
 }
 ```
 
 ### Health Check
-**GET** `/health`
+**GET** `/`
 ```json
 {
-  "status": "healthy",
-  "model_provider": "openai",
-  "model_name": "gpt-3.5-turbo",
-  "test_translation": "नमस्कार"
+  "message": "ShabdSetu Bidirectional Translation API is running!",
+  "version": "3.0.0",
+  "features": ["English to Marathi", "Marathi to English", "Auto-detection", "Real-time"],
+  "translation_apis": ["Dictionary", "MyMemory", "Google Translate (Free)", "Lingva Translate", "LibreTranslate"]
 }
 ```
 
-## 📖 Documentation
+## Testing
 
-- **API Documentation**: http://localhost:8000/docs (Swagger UI)
-- **Alternative API Docs**: http://localhost:8000/redoc (ReDoc)
-
-## 🧪 Testing
-
-### Backend Testing
+### API Testing with curl
 ```bash
-cd Backend
-python test_api.py
-```
-
-### Manual Testing with curl
-```bash
-curl -X POST "http://localhost:8000/translate" \
+# Test English to Marathi
+curl -X POST "http://localhost:8003/translate" \
      -H "Content-Type: application/json" \
-     -d '{
-       "text": "Good morning!",
-       "source_language": "English",
-       "target_language": "Marathi"
-     }'
+     -d '{"text": "Good morning", "source_lang": "auto", "target_lang": "auto"}'
+
+# Test romanized Marathi to English
+curl -X POST "http://localhost:8003/translate" \
+     -H "Content-Type: application/json" \
+     -d '{"text": "namaskar kasa ahat", "source_lang": "auto", "target_lang": "auto"}'
+
+# Check API status
+curl http://localhost:8003/
 ```
 
-## 🛠️ Tech Stack
+### Voice Testing Utility
+Open `test_marathi.html` in your browser to test voice synthesis capabilities with different languages and voices.
 
-### Backend
-- **FastAPI** - Modern, fast web framework for building APIs
-- **LangChain** - Framework for developing applications with LLMs
-- **OpenAI** - GPT models for high-quality translations
-- **Uvicorn** - ASGI server for running the application
-- **Pydantic** - Data validation using Python type annotations
+## Project Structure
 
-### Frontend
-- **React 18** - Modern UI library with hooks
-- **Vite** - Next-generation frontend tooling
-- **Tailwind CSS** - Utility-first CSS framework
-- **Axios** - Promise-based HTTP client
-- **Lucide React** - Beautiful, customizable icons
+```
+ShabdSetu/
+├── Backend/                    # FastAPI translation server
+│   ├── main.py                # Main application with 5 translation APIs
+│   ├── requirements.txt       # Python dependencies
+│   ├── .env.example          # Environment template
+│   └── README.md             # Detailed backend documentation
+├── Frontend/                   # React speech interface
+│   ├── src/
+│   │   ├── App.jsx           # Main application with speech features
+│   │   ├── main.jsx          # Entry point
+│   │   └── index.css         # Tailwind CSS styling
+│   ├── package.json          # Node.js dependencies
+│   └── vite.config.js        # Vite configuration
+├── test_marathi.html          # Voice synthesis testing tool
+└── README.md                  # This documentation
+```
 
-## 🚧 Development
+## Browser Compatibility
 
-### Adding New Features
+### Fully Supported
+- **Chrome 70+** - Complete feature support (Recommended)
+- **Edge 79+** - Complete feature support
+- **Firefox 65+** - Complete feature support
+- **Safari 14+** - Complete feature support
 
-1. **Backend**: Add new endpoints in `Backend/main.py`
-2. **Frontend**: Create new components in `Frontend/src/`
-3. **Testing**: Update test files accordingly
+### Requirements
+- Web Speech API support for speech recognition
+- Speech Synthesis API for text-to-speech
+- Microphone permissions for voice input
+- Internet connection for translation APIs
 
-### Code Style
-- **Backend**: Follow PEP 8 Python style guide
-- **Frontend**: Use ESLint and Prettier for consistent formatting
+## Advanced Features
 
-## 🤝 Contributing
+### Language Detection Algorithm
+- **Devanagari Script Recognition** - Identifies Marathi text automatically
+- **Romanized Marathi Detection** - Recognizes phonetic Marathi words
+- **Statistical Analysis** - Uses word frequency and pattern matching
+- **Confidence Scoring** - Provides detection reliability metrics
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+### Translation Quality Optimization
+- **API Response Ranking** - Selects best translation from multiple sources
+- **Context Preservation** - Maintains meaning across language boundaries
+- **Cultural Adaptation** - Adjusts translations for local context
+- **Quality Assessment** - Validates translation completeness
 
-## 📝 License
+### Performance Enhancements
+- **Intelligent Caching** - Stores frequently used translations
+- **Rate Limiting** - Manages API calls to prevent throttling
+- **Async Processing** - Non-blocking translation requests
+- **Optimized Voice Loading** - Fast voice synthesis initialization
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## Troubleshooting
 
-## 🙏 Acknowledgments
+### Common Issues
 
-- **OpenAI** for providing powerful language models
-- **LangChain** for the excellent framework
-- **Marathi Language Community** for inspiration
-- **Open Source Community** for the amazing tools and libraries
+**Speech recognition not working:**
+- Ensure microphone permissions are granted
+- Check browser Web Speech API support
+- Verify HTTPS connection (required for some browsers)
+- Try speaking more clearly and at normal volume
 
-## 📞 Support
+**Translation accuracy issues:**
+- Use shorter, clearer phrases for better results
+- Try both romanized and Devanagari script for Marathi
+- Check if the phrase exists in the built-in dictionary
+- Ensure good internet connection for API access
 
-If you encounter any issues or have questions:
+**API connection errors:**
+- Verify backend server is running on port 8003
+- Check if frontend is accessing the correct API endpoint
+- Ensure CORS configuration allows your browser origin
+- Check network connectivity and firewall settings
 
-1. Check the [Issues](https://github.com/sumitmahankale/ShabdSetu/issues) page
-2. Create a new issue if your problem isn't already reported
-3. Provide detailed information about your environment and the issue
+### Debug Features
+- **Real-time Logging** - View translation method and API responses
+- **Language Detection Info** - See confidence scores and detected patterns
+- **Voice Selection Details** - Monitor which voice is being used
+- **Performance Metrics** - Track response times and cache hit rates
+
+## Development
+
+### Adding New Translation APIs
+1. Implement new translation method in `BilingualTranslationService`
+2. Add to the fallback chain in the main `translate` method
+3. Update health check endpoint to include new API
+4. Test with various input types and edge cases
+
+### Frontend Customization
+- Modify `App.jsx` for UI changes and new features
+- Update Tailwind classes for visual styling
+- Extend voice synthesis options in `speakText` function
+- Enhance language detection in `detectLanguage` function
+
+### Backend Extensions
+- Add new language pairs by extending detection algorithms
+- Implement additional translation APIs or local models
+- Enhance caching strategies for better performance
+- Add analytics and usage monitoring features
+
+## Contributing
+
+We welcome contributions! Please follow these guidelines:
+
+1. **Fork** the repository and create a feature branch
+2. **Test thoroughly** with both English and Marathi inputs
+3. **Update documentation** for any API or feature changes
+4. **Follow code style** guidelines for both frontend and backend
+5. **Submit pull request** with clear description and test results
+
+### Code Standards
+- **Backend**: Follow PEP 8 Python conventions
+- **Frontend**: Use ESLint and Prettier for consistency
+- **Documentation**: Update README for any significant changes
+- **Testing**: Include test cases for new features
+
+## Future Roadmap
+
+### Planned Features
+- **Offline Translation** - Local model support for internet-free usage
+- **Additional Languages** - Hindi, Tamil, Telugu, and other Indian languages
+- **Mobile Applications** - Native iOS and Android apps
+- **Voice Training** - Custom pronunciation and accent adaptation
+- **Translation Confidence** - User feedback and quality scoring
+
+### Technical Improvements
+- **WebAssembly Integration** - Faster local processing
+- **Progressive Web App** - Offline functionality and app-like experience
+- **Edge Computing** - Reduced latency with edge deployment
+- **Advanced Caching** - Intelligent prediction and pre-loading
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- **MyMemory Translation API** for reliable translation services
+- **Google Translate** for high-quality language processing
+- **LibreTranslate** for open-source translation capabilities
+- **Web Speech API Community** for browser integration standards
+- **Marathi Language Community** for cultural insights and feedback
+
+## Support
+
+For issues, questions, or feature requests:
+
+1. Check existing [Issues](https://github.com/sumitmahankale/ShabdSetu/issues)
+2. Create new issue with detailed information
+3. Provide browser, OS, and error details
+4. Include steps to reproduce any problems
 
 ---
 
-**Made with ❤️ for the Marathi community**
+**Made with dedication for the Marathi community**
 
-*ShabdSetu - Building bridges between languages*
+*ShabdSetu - Building intelligent bridges between languages*
