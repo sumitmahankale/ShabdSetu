@@ -198,7 +198,7 @@ class BilingualTranslationService:
         return converted_text
 
     def translate_with_mymemory(self, text: str, source_lang: str, target_lang: str) -> str:
-        """Translate using MyMemory API with proper Marathi support"""
+        """Translate using MyMemory API with enhanced Marathi support"""
         try:
             # Rate limiting - max 1 call per second
             current_time = time.time()
@@ -214,71 +214,53 @@ class BilingualTranslationService:
                     api_text = self.romanized_to_devanagari(text)
                     logger.info(f"Converted romanized text '{text}' to Devanagari: '{api_text}'")
             
-            # Try direct Marathi first, then fallback to Hindi if needed
             url = "https://api.mymemory.translated.net/get"
             
-            # First attempt with direct Marathi codes
+            # For Marathi translations, try multiple approaches
             if source_lang == 'mr' or target_lang == 'mr':
-                api_source = 'mr' if source_lang == 'mr' else source_lang
-                api_target = 'mr' if target_lang == 'mr' else target_lang
-                langpair = f'{api_source}|{api_target}'
+                # Try 1: Direct Marathi codes
+                api_source = 'mr' if source_lang == 'mr' else 'en'
+                api_target = 'mr' if target_lang == 'mr' else 'en'
                 
-                params = {
-                    'q': api_text,
-                    'langpair': langpair,
-                    'de': 'shabdsetu@example.com'
-                }
+                attempts = [
+                    (api_source, api_target, api_text),  # Original text
+                    ('hi', 'en' if target_lang == 'en' else 'hi', api_text),  # Hindi fallback
+                    ('mr', 'en' if target_lang == 'en' else 'mr', text)  # Original romanized
+                ]
                 
-                logger.info(f"MyMemory API call (Marathi): {langpair} for '{api_text[:30]}...'")
-                
-                response = requests.get(url, params=params, timeout=10)
-                self.last_api_call_time = time.time()
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    if (data.get('responseData') and 
-                        data['responseData'].get('translatedText') and
-                        data['responseData']['translatedText'].lower() != api_text.lower()):
-                        
-                        translation = data['responseData']['translatedText']
-                        logger.info(f"MyMemory Marathi translation successful: {translation}")
-                        return translation
-                
-                # Fallback to Hindi if Marathi direct doesn't work
-                logger.info("Trying Hindi fallback...")
-                api_source_fallback = 'hi' if source_lang == 'mr' else source_lang
-                api_target_fallback = 'hi' if target_lang == 'mr' else target_lang
-                langpair_fallback = f'{api_source_fallback}|{api_target_fallback}'
-                
-                params_fallback = {
-                    'q': api_text,
-                    'langpair': langpair_fallback,
-                    'de': 'shabdsetu@example.com'
-                }
-                
-                logger.info(f"MyMemory API call (Hindi fallback): {langpair_fallback} for '{api_text[:30]}...'")
-                
-                response = requests.get(url, params=params_fallback, timeout=10)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    if (data.get('responseData') and 
-                        data['responseData'].get('translatedText') and
-                        data['responseData']['translatedText'].lower() != api_text.lower()):
-                        
-                        translation = data['responseData']['translatedText']
-                        logger.info(f"MyMemory Hindi fallback successful: {translation}")
-                        return translation
+                for attempt_source, attempt_target, attempt_text in attempts:
+                    langpair = f'{attempt_source}|{attempt_target}'
+                    params = {
+                        'q': attempt_text,
+                        'langpair': langpair,
+                        'de': 'shabdsetu@example.com'
+                    }
+                    
+                    logger.info(f"MyMemory API attempt: {langpair} for '{attempt_text[:30]}...'")
+                    
+                    response = requests.get(url, params=params, timeout=10)
+                    self.last_api_call_time = time.time()
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        if (data.get('responseData') and 
+                            data['responseData'].get('translatedText') and
+                            data['responseData']['translatedText'].lower().strip() != attempt_text.lower().strip() and
+                            len(data['responseData']['translatedText'].strip()) > 0):
+                            
+                            translation = data['responseData']['translatedText']
+                            logger.info(f"MyMemory translation successful: {translation}")
+                            return translation
+                    
+                    time.sleep(0.5)  # Small delay between attempts
             else:
-                # For non-Marathi translations, use direct codes
+                # For non-Marathi translations
                 params = {
                     'q': api_text,
                     'langpair': f'{source_lang}|{target_lang}',
                     'de': 'shabdsetu@example.com'
                 }
                 
-                logger.info(f"MyMemory API call: {source_lang}|{target_lang} for '{api_text[:30]}...'")
-                
                 response = requests.get(url, params=params, timeout=10)
                 self.last_api_call_time = time.time()
                 
@@ -286,7 +268,7 @@ class BilingualTranslationService:
                     data = response.json()
                     if (data.get('responseData') and 
                         data['responseData'].get('translatedText') and
-                        data['responseData']['translatedText'].lower() != api_text.lower()):
+                        data['responseData']['translatedText'].lower().strip() != api_text.lower().strip()):
                         
                         translation = data['responseData']['translatedText']
                         logger.info(f"MyMemory translation successful: {translation}")
