@@ -60,32 +60,36 @@ class TranslationService:
             raise
     
     def _create_translation_prompt(self):
-        """Create a prompt template for translation"""
-        template = """You are an expert translator specializing in English to Marathi translation. 
-        
-Your task is to translate the given English text to accurate, natural-sounding Marathi.
+        """Create a prompt template for bidirectional translation"""
+        template = """You are an expert translator specializing in English-Marathi bidirectional translation. 
+
+Your task is to translate the given text from {source_language} to {target_language}.
 
 Guidelines:
 1. Maintain the original meaning and context
-2. Use appropriate Marathi grammar and sentence structure
+2. Use appropriate grammar and sentence structure for the target language
 3. Consider cultural nuances when translating
-4. For technical terms, use commonly accepted Marathi equivalents or keep English terms if widely used
+4. For technical terms, use commonly accepted equivalents or keep original terms if widely used
 5. Return ONLY the translated text, no explanations or additional comments
 
-English text to translate: {text}
+Text to translate ({source_language}): {text}
 
-Marathi translation:"""
+Translation ({target_language}):"""
         
         return PromptTemplate(
-            input_variables=["text"],
+            input_variables=["text", "source_language", "target_language"],
             template=template
         )
     
     async def translate(self, text: str, source_lang: str = "English", target_lang: str = "Marathi") -> str:
-        """Translate text from source language to target language"""
+        """Translate text from source language to target language (bidirectional)"""
         try:
-            # Format the prompt with the input text
-            formatted_prompt = self.translation_prompt.format(text=text)
+            # Format the prompt with the input text and languages
+            formatted_prompt = self.translation_prompt.format(
+                text=text,
+                source_language=source_lang,
+                target_language=target_lang
+            )
             
             # Get translation from LLM
             if hasattr(self.llm, 'ainvoke'):
@@ -97,7 +101,7 @@ Marathi translation:"""
                 response = self.llm.invoke([HumanMessage(content=formatted_prompt)])
                 translated_text = response.content.strip()
             
-            logger.info(f"Successfully translated text: '{text[:50]}...' -> '{translated_text[:50]}...'")
+            logger.info(f"Successfully translated ({source_lang} -> {target_lang}): '{text[:50]}...' -> '{translated_text[:50]}...'")
             return translated_text
             
         except Exception as e:
