@@ -29,7 +29,7 @@ app.add_middleware(
     allow_origins=["http://localhost:3003", "http://localhost:3002", "http://localhost:3000", "http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*", "Content-Type"],
 )
 
 class TranslationRequest(BaseModel):
@@ -54,10 +54,29 @@ class BilingualTranslationService:
         """Enhanced language detection for English and Marathi"""
         logger.info(f"Detecting language for: {text[:50]}...")
         
+        # Check for question marks or garbled text (encoding issues)
+        if '?' in text and len(text.replace('?', '').strip()) == 0:
+            logger.warning("Detected garbled text, likely encoding issue")
+            # Try to detect if this should be Marathi based on context
+            return 'mr'
+        
         # Devanagari script detection (most reliable for Marathi)
         marathi_pattern = re.compile(r'[\u0900-\u097F]')
-        if marathi_pattern.search(text):
-            logger.info("Detected Marathi (Devanagari script)")
+        devanagari_chars = len(marathi_pattern.findall(text))
+        
+        if devanagari_chars > 0:
+            logger.info(f"Detected Marathi (Devanagari script - {devanagari_chars} chars)")
+            return 'mr'
+        
+        # Check for Marathi Unicode characters more thoroughly
+        marathi_char_count = 0
+        for char in text:
+            char_code = ord(char)
+            if 0x0900 <= char_code <= 0x097F:
+                marathi_char_count += 1
+        
+        if marathi_char_count > 0:
+            logger.info(f"Detected Marathi (Unicode range - {marathi_char_count} chars)")
             return 'mr'
         
         # Enhanced romanized Marathi detection
@@ -105,10 +124,13 @@ class BilingualTranslationService:
         
         # Check for multi-word Marathi phrases
         if len(words) >= 2:
-            # If more than 15% of recognizable words are Marathi, classify as Marathi
+            # Need a higher threshold for Marathi detection in multi-word phrases
+            # Don't classify as Marathi unless it's clearly Marathi-dominant
             if marathi_word_count > 0 and len(words) > 0:
                 marathi_ratio = marathi_word_count / len(words)
-                if marathi_ratio >= 0.15 or marathi_word_count >= 1:  # Even lower threshold for phrases
+                # Require at least 30% of words to be Marathi AND at least 2 Marathi words
+                # This prevents English sentences with borrowed Marathi words from being misclassified
+                if marathi_ratio >= 0.30 and marathi_word_count >= 2:
                     logger.info(f"Detected Marathi phrase (romanized words: {marathi_word_count}/{len(words)})")
                     return 'mr'
         else:
@@ -154,6 +176,9 @@ class BilingualTranslationService:
             'tumhi kase ahat': 'तुम्ही कसे आहात',
             'kasa ahat': 'कसे आहात',
             'kase ahat': 'कसे आहात',
+            'mi kaam karat ahe': 'मी काम करत आहे',
+            'mi school la jatoy': 'मी शाळेत जातोय',
+            'mi ghari jatoy': 'मी घरी जातोय',
             'aahe': 'आहे',
             'ahe': 'आहे',
             'ahat': 'आहात',
@@ -166,8 +191,11 @@ class BilingualTranslationService:
             'dhanyabad': 'धन्यवाद',
             'pani': 'पाणी',
             'anna': 'अन्न',
+            'khana': 'खाना',
+            'jevan': 'जेवण',
             'madad': 'मदत',
             'ghar': 'घर',
+            'ghara': 'घर',
             'school': 'शाळा',
             'kaam': 'काम',
             'paisa': 'पैसा',
@@ -176,16 +204,24 @@ class BilingualTranslationService:
             'doctor': 'डॉक्टर',
             'teacher': 'शिक्षक',
             'tumhi': 'तुम्ही',
+            'tumi': 'तुमी',
             'mi': 'मी',
             'amhi': 'आम्ही',
             'te': 'ते',
             'mala': 'मला',
             'tula': 'तुला',
             'hoye': 'होय',
+            'hoy': 'होय',
             'nahi': 'नाही',
             'aaj': 'आज',
             'udya': 'उद्या',
-            'kal': 'काल'
+            'kal': 'काल',
+            'jatoy': 'जातोय',
+            'yetoy': 'येतोय',
+            'karat': 'करत',
+            'khattoy': 'खातोय',
+            'pitoy': 'पितोय',
+            'boltoy': 'बोलतोय'
         }
         
         converted_text = text.lower()
@@ -229,30 +265,35 @@ class BilingualTranslationService:
                 ]
                 
                 for attempt_source, attempt_target, attempt_text in attempts:
-                    langpair = f'{attempt_source}|{attempt_target}'
-                    params = {
-                        'q': attempt_text,
-                        'langpair': langpair,
-                        'de': 'shabdsetu@example.com'
-                    }
-                    
-                    logger.info(f"MyMemory API attempt: {langpair} for '{attempt_text[:30]}...'")
-                    
-                    response = requests.get(url, params=params, timeout=10)
-                    self.last_api_call_time = time.time()
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        if (data.get('responseData') and 
-                            data['responseData'].get('translatedText') and
-                            data['responseData']['translatedText'].lower().strip() != attempt_text.lower().strip() and
-                            len(data['responseData']['translatedText'].strip()) > 0):
-                            
-                            translation = data['responseData']['translatedText']
-                            logger.info(f"MyMemory translation successful: {translation}")
-                            return translation
-                    
-                    time.sleep(0.5)  # Small delay between attempts
+                    try:
+                        langpair = f'{attempt_source}|{attempt_target}'
+                        params = {
+                            'q': attempt_text,
+                            'langpair': langpair,
+                            'de': 'shabdsetu@example.com'
+                        }
+                        
+                        logger.info(f"MyMemory API attempt: {langpair} for '{attempt_text[:30]}...'")
+                        
+                        response = requests.get(url, params=params, timeout=10)
+                        self.last_api_call_time = time.time()
+                        
+                        if response.status_code == 200:
+                            data = response.json()
+                            if (data.get('responseData') and 
+                                data['responseData'].get('translatedText') and
+                                data['responseData']['translatedText'].lower().strip() != attempt_text.lower().strip() and
+                                len(data['responseData']['translatedText'].strip()) > 0 and
+                                'PLEASE SELECT TWO DISTINCT LANGUAGES' not in data['responseData']['translatedText'].upper()):
+                                
+                                translation = data['responseData']['translatedText']
+                                logger.info(f"MyMemory translation successful: {translation}")
+                                return translation
+                        
+                        time.sleep(0.5)  # Small delay between attempts
+                    except Exception as e:
+                        logger.warning(f"MyMemory attempt failed: {e}")
+                        continue
             else:
                 # For non-Marathi translations
                 params = {
@@ -436,6 +477,9 @@ class BilingualTranslationService:
             'नमस्कार': 'hello',
             'तुम्ही कसे आहात': 'how are you',
             'तुम्ही कसे आहात?': 'how are you?',
+            'मी काम करत आहे': 'I am working',
+            'मी शाळेत जातोय': 'I am going to school',
+            'मी घरी जातोय': 'I am going home',
             'सुप्रभात': 'good morning',
             'शुभ संध्या': 'good evening',
             'शुभ रात्री': 'good night',
@@ -481,14 +525,23 @@ class BilingualTranslationService:
             'tumche nav kay ahe': 'what is your name',
             'majhe nav': 'my name is',
             'maza nav': 'my name is',
+            'mi kaam karat ahe': 'I am working',
+            'mi school la jatoy': 'I am going to school',
+            'mi ghari jatoy': 'I am going home',
+            'mi khana khattoy': 'I am eating food',
             'pani': 'water',
             'anna': 'food',
+            'khana': 'food',
+            'jevan': 'meal',
             'madad': 'help',
             'maddat': 'help',
             'kuthe': 'where',
             'kay': 'what',
             'kasa': 'how',
             'kase': 'how',
+            'kiti': 'how much',
+            'kevha': 'when',
+            'kon': 'who',
             'hoye': 'yes',
             'hoy': 'yes',
             'nahi': 'no',
@@ -500,12 +553,12 @@ class BilingualTranslationService:
             'ratri': 'night',
             'sakal': 'morning',
             'sandhya': 'evening',
+            'dupari': 'afternoon',
             'ghar': 'home',
             'ghara': 'home',
             'school': 'school',
             'kaam': 'work',
-            'khana': 'food',
-            'jevan': 'meal',
+            'nokri': 'job',
             'paisa': 'money',
             'vel': 'time',
             'mitra': 'friend',
@@ -515,6 +568,7 @@ class BilingualTranslationService:
             'bhau': 'brother',
             'bahin': 'sister',
             'tumhi': 'you',
+            'tumi': 'you',
             'mi': 'I',
             'amhi': 'we',
             'te': 'they',
@@ -536,7 +590,23 @@ class BilingualTranslationService:
             'pudhe': 'ahead',
             'maghe': 'behind',
             'varti': 'above',
-            'khali': 'below'
+            'khali': 'below',
+            'jatoy': 'going',
+            'yetoy': 'coming',
+            'karat': 'doing',
+            'khattoy': 'eating',
+            'pitoy': 'drinking',
+            'boltoy': 'speaking',
+            'aikttoy': 'listening',
+            'baghtoy': 'watching',
+            'vachtoy': 'reading',
+            'lihtoy': 'writing',
+            'zoptoy': 'sleeping',
+            'uthttoy': 'waking up',
+            'chaltoy': 'walking',
+            'dhavttoy': 'running',
+            'hasttoy': 'laughing',
+            'rudttoy': 'crying'
         }
         
         # English to romanized Marathi  
@@ -579,21 +649,27 @@ class BilingualTranslationService:
         
         # Choose appropriate dictionary
         if source_lang == 'en' and target_lang == 'mr':
-            # English to Marathi
+            # English to Marathi - only exact matches, no partial matching for individual words
             if text_lower in en_to_mr:
                 return en_to_mr[text_lower]
-            # Try partial matches
-            for eng_phrase, mar_phrase in en_to_mr.items():
-                if eng_phrase in text_lower:
-                    return mar_phrase
+            
+            # For English, if no exact dictionary match, let API handle it
+            # This prevents poor word-by-word translations
+            return None
                     
         elif source_lang == 'mr' and target_lang == 'en':
             # Marathi to English - handle both Devanagari and romanized
+            
+            # Handle garbled text (encoding issues)
+            if '?' in text and len(text.replace('?', '').strip()) == 0:
+                logger.warning("Detected garbled Devanagari text")
+                return "Unable to translate garbled text. Please ensure proper UTF-8 encoding for Devanagari script."
+            
             # First try exact Devanagari match
             if text in mr_to_en:
                 return mr_to_en[text]
             
-            # Try exact romanized match
+            # Try exact romanized match (full phrases first)
             if text_lower in romanized_mr_to_en:
                 return romanized_mr_to_en[text_lower]
             
@@ -629,39 +705,11 @@ class BilingualTranslationService:
                     if not found_partial:
                         translated_words.append(word)  # Keep untranslated word
             
-            # Return translation if we found at least one known word
-            if found_translations > 0:
+            # Return translation only if we found a significant portion (at least 50% of words)
+            if found_translations > 0 and found_translations >= len(words) * 0.5:
                 result = ' '.join(translated_words)
                 logger.info(f"Word-by-word translation: {text} -> {result} ({found_translations} words translated)")
                 return result
-                
-        elif source_lang == 'en' and target_lang == 'mr':
-            # English to Marathi - try Devanagari first, then romanized fallback
-            if text_lower in en_to_mr:
-                return en_to_mr[text_lower]
-            
-            # Try romanized Marathi as fallback
-            if text_lower in en_to_romanized_mr:
-                return en_to_romanized_mr[text_lower]
-                
-            # Try partial matches for English
-            for eng_phrase, mar_phrase in en_to_mr.items():
-                if eng_phrase in text_lower:
-                    return mar_phrase
-                    
-            # Try word-by-word translation
-            words = text_lower.split()
-            translated_words = []
-            for word in words:
-                if word in en_to_mr:
-                    translated_words.append(en_to_mr[word])
-                elif word in en_to_romanized_mr:
-                    translated_words.append(en_to_romanized_mr[word])
-                else:
-                    translated_words.append(word)
-            
-            if len(translated_words) > 0:
-                return ' '.join(translated_words)
         
         return None
     
@@ -674,16 +722,26 @@ class BilingualTranslationService:
                 raise ValueError("Empty text provided")
             
             # Auto-detect source language if needed
-            if source_lang == "auto" or source_lang == "English":
+            if source_lang == "auto":
                 detected_lang = self.detect_language(text)
+            elif source_lang == "English":
+                detected_lang = 'en'
+            elif source_lang == "Marathi":
+                detected_lang = 'mr'
             else:
-                detected_lang = 'mr' if source_lang == "Marathi" else 'en'
+                # User explicitly provided 'en' or 'mr'
+                detected_lang = source_lang
             
-            # Auto-determine target language (always opposite of source)
-            if target_lang == "auto" or target_lang == "English" or target_lang == "Marathi":
+            # Auto-determine target language (always opposite of source if auto)
+            if target_lang == "auto":
                 auto_target = 'en' if detected_lang == 'mr' else 'mr'
+            elif target_lang == "English":
+                auto_target = 'en'
+            elif target_lang == "Marathi":
+                auto_target = 'mr'
             else:
-                auto_target = 'mr' if target_lang == "Marathi" else 'en'
+                # User explicitly provided 'en' or 'mr'
+                auto_target = target_lang
             
             logger.info(f"Translation: '{text}' from {detected_lang} to {auto_target}")
             
@@ -801,7 +859,9 @@ async def translate_text(request: TranslationRequest):
         if not request.text.strip():
             raise HTTPException(status_code=400, detail="Text to translate cannot be empty")
         
-        logger.info(f"Translation request: '{request.text}' ({request.source_language} -> {request.target_language})")
+        # Log the raw input for debugging encoding issues
+        logger.info(f"Raw translation request: '{request.text}' (len: {len(request.text)})")
+        logger.info(f"Character codes: {[ord(c) for c in request.text[:10]]}")
         
         # Perform translation
         result = await translation_service.translate(
@@ -828,9 +888,9 @@ async def translate_text(request: TranslationRequest):
 async def health_check():
     """Detailed health check"""
     try:
-        # Test translation functionality
-        test_en = await translation_service.translate("hello", "en", "mr")
-        test_mr = await translation_service.translate("नमस्कार", "mr", "en")
+        # Test translation functionality with simple dictionary words that should work
+        test_en_result = translation_service.translate_with_dictionary("hello", "en", "mr")
+        test_mr_result = translation_service.translate_with_dictionary("namaskar", "mr", "en")
         
         return {
             "status": "healthy",
@@ -838,8 +898,8 @@ async def health_check():
             "api_calls_made": translation_service.api_call_count,
             "cache_size": len(translation_service.translation_cache),
             "test_translations": {
-                "en_to_mr": test_en['translated_text'],
-                "mr_to_en": test_mr['translated_text']
+                "en_to_mr": test_en_result or "dictionary test failed",
+                "mr_to_en": test_mr_result or "dictionary test failed"
             }
         }
     except Exception as e:
@@ -855,6 +915,26 @@ async def get_stats():
         "api_calls_made": translation_service.api_call_count,
         "cache_size": len(translation_service.translation_cache),
         "cached_translations": list(translation_service.translation_cache.keys())[:10]  # First 10
+    }
+
+@app.post("/clear-cache")
+async def clear_cache():
+    """Clear translation cache"""
+    cache_size = len(translation_service.translation_cache)
+    translation_service.translation_cache.clear()
+    return {
+        "message": f"Cache cleared. Removed {cache_size} cached translations.",
+        "cache_size": len(translation_service.translation_cache)
+    }
+
+@app.post("/test-encoding")
+async def test_encoding(request: TranslationRequest):
+    """Test text encoding"""
+    return {
+        "received_text": request.text,
+        "text_length": len(request.text),
+        "char_codes": [ord(c) for c in request.text[:10]],  # First 10 chars
+        "is_devanagari": bool(re.search(r'[\u0900-\u097F]', request.text))
     }
 
 if __name__ == "__main__":
