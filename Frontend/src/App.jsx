@@ -280,7 +280,10 @@ function App() {
   const [detectedLanguage, setDetectedLanguage] = useState('');
   const [targetLanguage, setTargetLanguage] = useState('');
   const [conversationHistory, setConversationHistory] = useState([]);
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false); // For floating interface
   const recognitionRef = useRef(null);
+  const chatEndRef = useRef(null);
 
   // Initialize speech recognition with bidirectional support
   useEffect(() => {
@@ -545,323 +548,390 @@ function App() {
     return languages[langCode] || langCode;
   };
 
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [conversationHistory]);
+
+  // Toggle floating interface
+  const toggleInterface = () => {
+    setIsExpanded(!isExpanded);
+    if (!isExpanded) {
+      setShowWelcome(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md shadow-sm border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl shadow-lg">
-                <Languages className="w-6 h-6 text-white" />
+    <div className="fixed inset-0 pointer-events-none">
+      {/* Floating Interface Container */}
+      <div className={`fixed transition-all duration-500 ease-in-out pointer-events-auto ${
+        isExpanded 
+          ? 'inset-4 md:inset-8' 
+          : 'bottom-6 right-6 w-16 h-16'
+      }`}>
+        
+        {/* Expanded Chat Interface */}
+        {isExpanded && (
+          <div className="w-full h-full bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-gray-200/50 flex flex-col overflow-hidden animate-in fade-in duration-300">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200/50 bg-white/80">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                    <Languages className="w-4 h-4 text-white" />
+                  </div>
+                  {isListening && (
+                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl opacity-30 animate-ping"></div>
+                  )}
+                </div>
+                <div>
+                  <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                    ShabdSetu AI
+                  </h1>
+                  <p className="text-xs text-gray-500">Real-time translator</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  ShabdSetu
-                </h1>
-                <p className="text-sm text-gray-600">शब्दसेतू - AI Translation</p>
+              
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 px-2 py-1 bg-green-50 border border-green-200 rounded-full">
+                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-medium text-green-700">Online</span>
+                </div>
+                {conversationHistory.length > 0 && (
+                  <button
+                    onClick={clearAll}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all duration-200"
+                    title="Clear conversation"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  onClick={toggleInterface}
+                  className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200"
+                  title="Minimize"
+                >
+                  <ArrowRight className="w-4 h-4 rotate-45" />
+                </button>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="px-3 py-1 bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 rounded-full text-sm font-medium shadow-sm">
-                🔄 Auto-detect
-              </span>
+
+            {/* Chat Messages Area */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {/* Welcome Message */}
+              {showWelcome && conversationHistory.length === 0 && (
+                <div className="text-center space-y-4 py-8">
+                  <div className="inline-block">
+                    <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-3xl flex items-center justify-center shadow-xl mb-4 mx-auto">
+                      <Sparkles className="w-8 h-8 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                      Hello! I'm your AI translator
+                    </h2>
+                    <p className="text-gray-600 max-w-md mx-auto mb-6">
+                      Speak in <span className="font-semibold text-blue-600">English</span> or 
+                      <span className="font-semibold text-purple-600"> मराठी</span> and I'll translate instantly
+                    </p>
+                  </div>
+
+                  {/* Quick Suggestions */}
+                  <div className="space-y-3 max-w-sm mx-auto">
+                    <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200/50">
+                      <h3 className="font-semibold text-blue-600 mb-2 text-sm">🇺🇸 Try in English</h3>
+                      <div className="space-y-1 text-xs text-gray-600">
+                        <p>"Hello, how are you?"</p>
+                        <p>"What is your name?"</p>
+                        <p>"Thank you very much"</p>
+                      </div>
+                    </div>
+                    <div className="bg-purple-50 rounded-2xl p-4 border border-purple-200/50">
+                      <h3 className="font-semibold text-purple-600 mb-2 text-sm">🇮🇳 मराठीत म्हणा</h3>
+                      <div className="space-y-1 text-xs text-gray-600">
+                        <p>"नमस्कार, तुम्ही कसे आहात?"</p>
+                        <p>"तुमचे नाव काय आहे?"</p>
+                        <p>"धन्यवाद"</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Conversation Messages */}
+              <div className="space-y-4">
+                {conversationHistory.map((entry) => (
+                  <div key={entry.id} className="space-y-3">
+                    {/* User Message */}
+                    <div className="flex justify-end">
+                      <div className="max-w-[70%]">
+                        <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-2xl rounded-br-md px-4 py-3 shadow-lg">
+                          <p className="text-sm font-medium mb-1">{entry.input}</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-blue-100 bg-white/20 px-2 py-0.5 rounded-full">
+                              {getLanguageDisplayName(entry.inputLang)}
+                            </span>
+                            <span className="text-xs text-blue-100">{entry.timestamp}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* AI Response */}
+                    <div className="flex justify-start">
+                      <div className="flex items-start gap-2 max-w-[70%]">
+                        <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                          <Languages className="w-3 h-3 text-white" />
+                        </div>
+                        <div className="bg-gray-50 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm border border-gray-200">
+                          <p className="text-gray-900 font-medium mb-2 text-sm">{entry.output}</p>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+                              {getLanguageDisplayName(entry.outputLang)}
+                            </span>
+                            <button
+                              onClick={() => speakText(entry.output, entry.outputLang)}
+                              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all duration-200"
+                              title="Speak translation"
+                            >
+                              <Volume2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Current Input/Translation in Progress */}
+                {(inputText || isLoading) && (
+                  <div className="space-y-3">
+                    {/* User's current input */}
+                    {inputText && (
+                      <div className="flex justify-end">
+                        <div className="max-w-[70%]">
+                          <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-2xl rounded-br-md px-4 py-3 shadow-lg">
+                            <p className="text-sm font-medium mb-1">{inputText}</p>
+                            {detectedLanguage && (
+                              <span className="text-xs text-blue-100 bg-white/20 px-2 py-0.5 rounded-full">
+                                {getLanguageDisplayName(detectedLanguage)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* AI thinking/responding */}
+                    {isLoading && (
+                      <div className="flex justify-start">
+                        <div className="flex items-start gap-2">
+                          <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center shadow-md">
+                            <Languages className="w-3 h-3 text-white" />
+                          </div>
+                          <div className="bg-gray-50 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm border border-gray-200">
+                            <div className="flex items-center gap-2">
+                              <div className="flex space-x-1">
+                                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
+                                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                              </div>
+                              <span className="text-xs text-gray-500">Translating...</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Current translation result */}
+                    {translatedText && !isLoading && (
+                      <div className="flex justify-start">
+                        <div className="flex items-start gap-2 max-w-[70%]">
+                          <div className="w-6 h-6 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center shadow-md">
+                            <Languages className="w-3 h-3 text-white" />
+                          </div>
+                          <div className="bg-gray-50 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm border border-gray-200">
+                            <p className="text-gray-900 font-medium mb-2 text-sm">{translatedText}</p>
+                            <div className="flex items-center justify-between gap-2">
+                              {targetLanguage && (
+                                <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+                                  {getLanguageDisplayName(targetLanguage)}
+                                </span>
+                              )}
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => speakText(translatedText, targetLanguage)}
+                                  className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all duration-200"
+                                  title="Speak translation"
+                                >
+                                  <Volume2 className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => navigator.clipboard.writeText(translatedText)}
+                                  className="p-1 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-all duration-200"
+                                  title="Copy translation"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Error Message */}
+                {error && (
+                  <div className="flex justify-start">
+                    <div className="flex items-start gap-2">
+                      <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center shadow-md">
+                        <span className="text-white text-xs">⚠️</span>
+                      </div>
+                      <div className="bg-red-50 border border-red-200 rounded-2xl rounded-bl-md px-4 py-3 max-w-[70%]">
+                        <p className="text-red-800 text-sm font-medium mb-1">Sorry, I encountered an issue</p>
+                        <p className="text-red-600 text-xs">{error}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div ref={chatEndRef} />
+              </div>
+            </div>
+
+            {/* Input Area */}
+            <div className="flex-shrink-0 bg-white/90 backdrop-blur-xl border-t border-gray-200/50 p-4">
+              {/* Speech support warning */}
+              {!speechSupported && (
+                <div className="mb-3 p-2 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                  <p className="text-amber-800 text-xs">
+                    ⚠️ Voice recognition not supported. Please use Chrome, Edge, or Safari.
+                  </p>
+                </div>
+              )}
+
+              {/* Voice Control */}
+              <div className="flex items-center justify-center gap-4">
+                {/* Language Indicator */}
+                {(detectedLanguage || isListening) && (
+                  <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-full">
+                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                    <span className="text-xs font-medium text-gray-700">
+                      {isListening ? 'Listening...' : getLanguageDisplayName(detectedLanguage)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Main Voice Button */}
+                <div className="relative">
+                  <button
+                    onClick={isListening ? stopListening : startListening}
+                    onMouseDown={() => setShowWelcome(false)}
+                    disabled={!speechSupported || isLoading}
+                    className={`relative w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 shadow-lg ${
+                      isListening 
+                        ? 'bg-gradient-to-r from-red-500 to-pink-500 scale-110' 
+                        : isSpeaking
+                        ? 'bg-gradient-to-r from-orange-500 to-amber-500 scale-105 animate-pulse'
+                        : isLoading
+                        ? 'bg-gradient-to-r from-blue-500 to-purple-500'
+                        : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:scale-105 hover:shadow-xl'
+                    } text-white disabled:opacity-50 disabled:cursor-not-allowed group`}
+                    title={isListening ? 'Stop listening' : 'Start speaking'}
+                  >
+                    {isListening ? (
+                      <div className="flex items-center justify-center">
+                        <div className="w-3 h-3 bg-white rounded-sm"></div>
+                      </div>
+                    ) : isSpeaking ? (
+                      <Volume2 className="w-5 h-5" />
+                    ) : isLoading ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <Mic className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+                    )}
+                    
+                    {/* Animated Ring for Active States */}
+                    {(isListening || isSpeaking) && (
+                      <div className="absolute inset-0 rounded-full border-2 border-white/30 animate-ping"></div>
+                    )}
+                  </button>
+                  
+                  {/* Ripple Effect */}
+                  {isListening && (
+                    <div className="absolute inset-0 rounded-full bg-red-400/20 animate-ping"></div>
+                  )}
+                </div>
+
+                {/* Stop Speaking Button */}
+                {isSpeaking && (
+                  <button
+                    onClick={stopSpeaking}
+                    className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition-all duration-200"
+                    title="Stop speaking"
+                  >
+                    <VolumeX className="w-4 h-4 text-gray-600" />
+                  </button>
+                )}
+              </div>
+
+              {/* Status Text */}
+              <div className="text-center mt-2">
+                {isListening && (
+                  <p className="text-red-600 font-medium animate-pulse text-xs">🎤 Listening...</p>
+                )}
+                {isSpeaking && (
+                  <p className="text-orange-600 font-medium animate-pulse text-xs">🔊 Speaking...</p>
+                )}
+                {isLoading && (
+                  <p className="text-blue-600 font-medium text-xs">🤖 Processing...</p>
+                )}
+                {!isListening && !isSpeaking && !isLoading && (
+                  <p className="text-gray-500 text-xs">
+                    {conversationHistory.length === 0 ? 'Tap the mic to start' : 'Tap to continue'}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-6 py-8">
-        {/* Central Voice Interface - Gemini Style */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/60 backdrop-blur-sm rounded-full border border-gray-200 shadow-sm mb-6">
-            <Sparkles className="w-4 h-4 text-purple-600" />
-            <span className="text-sm font-medium text-gray-700">Speak in any language</span>
-          </div>
-          
-          <h2 className="text-4xl font-bold text-gray-900 mb-3">
-            Start Speaking
-          </h2>
-          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Speak in <span className="font-semibold text-blue-600">English</span> or <span className="font-semibold text-purple-600">मराठी</span> and get instant translation with voice response
-          </p>
-
-          {/* Main Voice Button - Gemini Style */}
-          <div className="relative mb-8">
+        )}
+        
+        {/* Floating Button (when collapsed) */}
+        {!isExpanded && (
+          <div className="relative group">
             <button
-              onClick={isListening ? stopListening : startListening}
-              disabled={!speechSupported || isLoading}
-              className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 shadow-2xl ${
-                isListening 
-                  ? 'bg-gradient-to-r from-red-500 to-pink-500 scale-110 animate-pulse' 
-                  : isSpeaking
-                  ? 'bg-gradient-to-r from-orange-500 to-amber-500 scale-105 animate-pulse'
-                  : isLoading
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-500 animate-spin'
-                  : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:scale-105'
-              } text-white disabled:opacity-50 disabled:cursor-not-allowed`}
-              title={isListening ? 'Stop listening' : 'Start voice translation'}
+              onClick={toggleInterface}
+              className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full shadow-2xl flex items-center justify-center text-white hover:scale-110 transition-all duration-300 group-hover:shadow-[0_0_30px_rgba(99,102,241,0.5)]"
+              title="Open ShabdSetu AI Translator"
             >
               {isListening ? (
-                <MicOff className="w-10 h-10" />
+                <div className="relative">
+                  <Mic className="w-8 h-8 animate-pulse" />
+                  <div className="absolute inset-0 rounded-full border-4 border-white/30 animate-ping"></div>
+                </div>
               ) : isSpeaking ? (
-                <Volume2 className="w-10 h-10" />
-              ) : isLoading ? (
-                <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                <Volume2 className="w-8 h-8 animate-pulse" />
               ) : (
-                <Mic className="w-10 h-10" />
-              )}
-              
-              {/* Animated Ring */}
-              {(isListening || isSpeaking) && (
-                <div className="absolute inset-0 rounded-full border-4 border-white/30 animate-ping"></div>
+                <Languages className="w-8 h-8 group-hover:rotate-12 transition-transform duration-300" />
               )}
             </button>
             
-            {/* Status Text */}
-            <div className="mt-4">
-              {isListening && (
-                <p className="text-red-600 font-medium animate-pulse">🎤 Listening...</p>
-              )}
-              {isSpeaking && (
-                <p className="text-orange-600 font-medium animate-pulse">🔊 Speaking...</p>
-              )}
-              {isLoading && (
-                <p className="text-blue-600 font-medium">🔄 Translating...</p>
-              )}
-              {!isListening && !isSpeaking && !isLoading && (
-                <p className="text-gray-600">Tap to start speaking</p>
-              )}
-            </div>
-          </div>
-
-          {/* Language Detection Display */}
-          {detectedLanguage && targetLanguage && (
-            <div className="flex items-center justify-center gap-4 mb-8">
-              <div className="px-4 py-2 bg-white rounded-lg shadow-sm border border-gray-200">
-                <span className="text-sm font-medium text-gray-700">
-                  {getLanguageDisplayName(detectedLanguage)}
-                </span>
-              </div>
-              <ArrowRight className="w-5 h-5 text-gray-400" />
-              <div className="px-4 py-2 bg-white rounded-lg shadow-sm border border-gray-200">
-                <span className="text-sm font-medium text-gray-700">
-                  {getLanguageDisplayName(targetLanguage)}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Speech support warning */}
-          {!speechSupported && (
-            <div className="mb-8 p-4 bg-amber-50 border border-amber-200 rounded-xl max-w-md mx-auto">
-              <p className="text-amber-800 text-sm">
-                ⚠️ Voice recognition not supported. Please use Chrome, Edge, or Safari.
-              </p>
-            </div>
-          )}
-
-          {/* Status Messages */}
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl max-w-md mx-auto">
-              <p className="text-red-800 text-sm">{error}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Current Translation Display */}
-        {(inputText || translatedText || error) && (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 mb-8">
-            {error ? (
-              <div className="text-center">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-red-600 text-2xl">⚠️</span>
-                </div>
-                <p className="text-red-600 font-medium mb-2">Translation Error</p>
-                <p className="text-red-500 text-sm">{error}</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {inputText && (
-                  <div className="text-center">
-                    <div className="text-sm text-gray-500 mb-2">You said:</div>
-                    <p className="text-lg text-gray-900 font-medium">{inputText}</p>
-                    {detectedLanguage && (
-                      <div className="mt-2">
-                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full">
-                          {getLanguageDisplayName(detectedLanguage)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {translatedText && (
-                  <div className="text-center border-t border-gray-100 pt-6">
-                    <div className="text-sm text-gray-500 mb-2">Translation:</div>
-                    <p className="text-xl text-gray-900 font-semibold mb-4">{translatedText}</p>
-                    {targetLanguage && (
-                      <span className="text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">
-                        {getLanguageDisplayName(targetLanguage)}
-                      </span>
-                    )}
-                    
-                    {/* Action Buttons */}
-                    <div className="flex items-center justify-center gap-3 mt-4">
-                      <button
-                        onClick={() => speakText(translatedText, targetLanguage)}
-                        className="p-2 text-gray-500 hover:text-blue-600 transition-colors rounded-lg hover:bg-blue-50"
-                        title="Listen to translation"
-                      >
-                        <Volume2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => navigator.clipboard.writeText(translatedText)}
-                        className="p-2 text-gray-500 hover:text-green-600 transition-colors rounded-lg hover:bg-green-50"
-                        title="Copy translation"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
+            {/* Floating Badge */}
+            {conversationHistory.length > 0 && (
+              <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-lg animate-bounce">
+                {conversationHistory.length}
               </div>
             )}
-          </div>
-        )}
-
-        {/* Conversation History */}
-        {conversationHistory.length > 0 && (
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Recent Translations</h3>
-              <button
-                onClick={clearAll}
-                className="text-sm text-gray-500 hover:text-red-600 transition-colors flex items-center gap-1"
-              >
-                <RotateCcw className="w-4 h-4" />
-                Clear all
-              </button>
-            </div>
-            <div className="space-y-3">
-              {conversationHistory.map((entry) => (
-                <div key={entry.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded-full">
-                          {getLanguageDisplayName(entry.inputLang)}
-                        </span>
-                        <ArrowRight className="w-3 h-3 text-gray-400" />
-                        <span className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded-full">
-                          {getLanguageDisplayName(entry.outputLang)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-1">{entry.input}</p>
-                      <p className="text-sm text-gray-900 font-medium">{entry.output}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => speakText(entry.output, entry.outputLang)}
-                        className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                      >
-                        <Volume2 className="w-3 h-3" />
-                      </button>
-                      <span className="text-xs text-gray-400">{entry.timestamp}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            
+            {/* Tooltip */}
+            <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-sm px-3 py-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
+              ShabdSetu AI Translator
+              <div className="absolute left-full top-1/2 -translate-y-1/2 border-4 border-transparent border-l-gray-900"></div>
             </div>
           </div>
         )}
-
-        {/* Features Section */}
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
-          <div className="text-center p-6 bg-white rounded-2xl shadow-sm border border-gray-200">
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <Languages className="w-6 h-6 text-blue-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Auto-Detect</h3>
-            <p className="text-gray-600 text-sm">Automatically detects whether you're speaking English or Marathi</p>
-          </div>
-          
-          <div className="text-center p-6 bg-white rounded-2xl shadow-sm border border-gray-200">
-            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <Volume2 className="w-6 h-6 text-green-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Voice Response</h3>
-            <p className="text-gray-600 text-sm">Automatically speaks the translation in the target language</p>
-          </div>
-          
-          <div className="text-center p-6 bg-white rounded-2xl shadow-sm border border-gray-200">
-            <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <Sparkles className="w-6 h-6 text-purple-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Free & Fast</h3>
-            <p className="text-gray-600 text-sm">No API keys required, works instantly with free translation services</p>
-          </div>
-        </div>
-
-        {/* How to Use */}
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-8 text-center mb-8">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">How to Use</h3>
-          <div className="max-w-2xl mx-auto space-y-3 text-gray-700 mb-6">
-            <p className="flex items-center justify-center gap-2">
-              <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">1</span>
-              Tap the microphone button
-            </p>
-            <p className="flex items-center justify-center gap-2">
-              <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">2</span>
-              Speak in English or Marathi
-            </p>
-            <p className="flex items-center justify-center gap-2">
-              <span className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-sm font-bold">3</span>
-              Listen to the automatic translation
-            </p>
-          </div>
-          
-          {/* Test Phrases */}
-          <div className="border-t border-gray-200 pt-6">
-            <h4 className="text-lg font-semibold text-gray-800 mb-4">Try These Phrases:</h4>
-            <div className="grid md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <h5 className="font-medium text-blue-600 mb-2">English Examples:</h5>
-                <div className="space-y-1 text-gray-600">
-                  <p>"Hello, how are you?"</p>
-                  <p>"What is your name?"</p>
-                  <p>"Thank you very much"</p>
-                  <p>"Where is the bathroom?"</p>
-                </div>
-              </div>
-              <div>
-                <h5 className="font-medium text-purple-600 mb-2">Marathi Examples:</h5>
-                <div className="space-y-1 text-gray-600">
-                  <p>"नमस्कार, तुम्ही कसे आहात?"</p>
-                  <p>"तुमचे नाव काय आहे?"</p>
-                  <p>"धन्यवाद"</p>
-                  <p>"स्नानगृह कुठे आहे?"</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-white/80 backdrop-blur-md border-t border-gray-200 mt-16">
-        <div className="max-w-4xl mx-auto px-6 py-8">
-          <div className="text-center text-gray-600">
-            <p className="mb-2">
-              Made with <Heart className="w-4 h-4 text-red-500 inline mx-1" /> for seamless communication
-            </p>
-            <p className="text-sm">
-              ShabdSetu - Bridging languages with AI • Powered by free translation services
-            </p>
-          </div>
-        </div>
-      </footer>
+      </div>
     </div>
   );
 }

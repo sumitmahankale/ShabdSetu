@@ -259,9 +259,9 @@ class BilingualTranslationService:
                 api_target = 'mr' if target_lang == 'mr' else 'en'
                 
                 attempts = [
-                    (api_source, api_target, api_text),  # Original text
-                    ('hi', 'en' if target_lang == 'en' else 'hi', api_text),  # Hindi fallback
-                    ('mr', 'en' if target_lang == 'en' else 'mr', text)  # Original romanized
+                    (api_source, api_target, api_text),  # Original text with proper Marathi
+                    ('mr', 'en' if target_lang == 'en' else 'mr', text),  # Original romanized
+                    ('hi', 'en' if target_lang == 'en' else 'hi', api_text)  # Hindi as last fallback
                 ]
                 
                 for attempt_source, attempt_target, attempt_text in attempts:
@@ -327,7 +327,7 @@ class BilingualTranslationService:
         """Translate using Google Translate (free/unofficial API)"""
         try:
             # Map language codes for Google
-            lang_map = {'mr': 'hi', 'en': 'en'}  # Use Hindi for Marathi
+            lang_map = {'mr': 'mr', 'en': 'en'}  # Use proper Marathi code
             source_code = lang_map.get(source_lang, source_lang)
             target_code = lang_map.get(target_lang, target_lang)
             
@@ -363,7 +363,7 @@ class BilingualTranslationService:
         """Translate using Lingva Translate (free alternative to Google)"""
         try:
             # Map language codes
-            lang_map = {'mr': 'hi', 'en': 'en'}
+            lang_map = {'mr': 'mr', 'en': 'en'}  # Use proper Marathi code
             source_code = lang_map.get(source_lang, source_lang)
             target_code = lang_map.get(target_lang, target_lang)
             
@@ -392,7 +392,7 @@ class BilingualTranslationService:
         """Translate using LibreTranslate (free and open source)"""
         try:
             # Map language codes
-            lang_map = {'mr': 'hi', 'en': 'en'}
+            lang_map = {'mr': 'mr', 'en': 'en'}  # Use proper Marathi code
             source_code = lang_map.get(source_lang, source_lang)
             target_code = lang_map.get(target_lang, target_lang)
             
