@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Marathi Speech</title>
+</head>
+<body>
+    <h1>Test Marathi Speech Synthesis</h1>
+    <button onclick="testMarathiSpeech()">Test Marathi Speech</button>
+    <button onclick="testEnglishSpeech()">Test English Speech</button>
+    <div id="status"></div>
+
+    <script>
+        function testMarathiSpeech() {
+            const text = "नमस्कार तुम्ही कसे आहात";
+            speak(text, 'hi-IN'); // Using Hindi voice for Marathi
+            document.getElementById('status').innerHTML = `Testing Marathi: ${text}`;
+        }
+
+        function testEnglishSpeech() {
+            const text = "Hello how are you";
+            speak(text, 'en-US');
+            document.getElementById('status').innerHTML = `Testing English: ${text}`;
+        }
+
+        function speak(text, lang) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = lang;
+                utterance.rate = 0.8;
+                utterance.pitch = 1;
+                
+                // Get available voices
+                const voices = speechSynthesis.getVoices();
+                console.log('Available voices:', voices);
+                
+                // Try to find appropriate voice
+                const voice = voices.find(v => v.lang.includes(lang.split('-')[0]));
+                if (voice) {
+                    utterance.voice = voice;
+                    console.log('Using voice:', voice.name);
+                }
+                
+                speechSynthesis.speak(utterance);
+            } else {
+                alert('Speech synthesis not supported');
+            }
+        }
+
+        // Load voices when page loads
+        speechSynthesis.onvoiceschanged = function() {
+            console.log('Voices loaded');
+        };
+    </script>
+</body>
+</html>
