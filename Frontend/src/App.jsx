@@ -52,25 +52,72 @@ function App() {
       const response = await fetch(`http://localhost:8003/translate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, target_language: 'mr' })
+        body: JSON.stringify({ 
+          text, 
+          source_language: 'auto',
+          target_language: 'auto' 
+        })
       });
       const data = await response.json();
       setTranslatedText(data.translated_text);
-      speakText(data.translated_text);
+      
+      // Only speak if translation was successful and not a fallback message
+      if (data.translated_text && !data.translated_text.includes('Translation not available')) {
+        speakText(data.translated_text, data.target_language);
+      }
     } catch (error) {
       console.error('Translation error:', error);
+      setTranslatedText('Translation failed. Please try again.');
     }
     setIsLoading(false);
   };
 
   // Text to speech
-  const speakText = (text) => {
-    if ('speechSynthesis' in window) {
+  const speakText = (text, targetLang = 'mr') => {
+    if ('speechSynthesis' in window && text) {
+      // Stop any current speech
+      speechSynthesis.cancel();
+      
       setIsSpeaking(true);
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'mr-IN';
-      utterance.onend = () => setIsSpeaking(false);
+      
+      // Set language based on target language
+      if (targetLang === 'mr') {
+        utterance.lang = 'hi-IN'; // Use Hindi for better Marathi support
+        utterance.rate = 0.8; // Slower rate for clarity
+      } else {
+        utterance.lang = 'en-US';
+        utterance.rate = 0.9;
+      }
+      
+      utterance.volume = 0.8;
+      utterance.pitch = 1.0;
+      
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        console.log('Speech synthesis completed');
+      };
+      
+      utterance.onerror = (event) => {
+        console.error('Speech synthesis error:', event);
+        setIsSpeaking(false);
+        
+        // Fallback: try with different language
+        if (targetLang === 'mr') {
+          setTimeout(() => {
+            const fallbackUtterance = new SpeechSynthesisUtterance(text);
+            fallbackUtterance.lang = 'en-US';
+            fallbackUtterance.rate = 0.8;
+            speechSynthesis.speak(fallbackUtterance);
+          }, 100);
+        }
+      };
+      
+      console.log(`Speaking: "${text}" in language: ${utterance.lang}`);
       speechSynthesis.speak(utterance);
+    } else {
+      console.warn('Speech synthesis not supported');
+      setIsSpeaking(false);
     }
   };
 

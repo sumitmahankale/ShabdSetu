@@ -2,6 +2,19 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Windows problematic files
+nul
+CON
+PRN
+AUX
+
+# Database files
+*.sqlite
+*.db
+
+# Cache files
+translation_cache.*
+
 # Distribution / packaging
 .Python
 build/

@@ -10,6 +10,43 @@ import time
 import json
 import urllib.parse
 
+# Import comprehensive translation libraries
+try:
+    from indic_transliteration import sanscript
+    from indic_transliteration.sanscript import transliterate
+    INDIC_AVAILABLE = True
+except ImportError:
+    INDIC_AVAILABLE = False
+
+try:
+    from deep_translator import GoogleTranslator, MyMemoryTranslator, LibreTranslator, LingueeTranslator
+    DEEP_TRANSLATOR_AVAILABLE = True
+except ImportError:
+    DEEP_TRANSLATOR_AVAILABLE = False
+
+try:
+    from googletrans import Translator as GoogleTranslator2
+    GOOGLETRANS_AVAILABLE = True
+except ImportError:
+    GOOGLETRANS_AVAILABLE = False
+
+try:
+    from transliterate import translit
+    TRANSLITERATE_AVAILABLE = True
+except ImportError:
+    TRANSLITERATE_AVAILABLE = False
+
+try:
+    from langdetect import detect
+    LANGDETECT_AVAILABLE = True
+except ImportError:
+    LANGDETECT_AVAILABLE = False
+
+import requests_cache
+
+# Setup cached session for faster API calls
+session = requests_cache.CachedSession('translation_cache', expire_after=3600)
+
 # Load environment variables
 load_dotenv()
 
@@ -90,14 +127,16 @@ class BilingualTranslationService:
             'aahe', 'aahet', 'aahat', 'navyane', 'juna', 'mottha', 'chota',
             'ghara', 'ghar', 'gaon', 'shahar', 'rasta', 'dukan', 'school',
             'nav', 'saathi', 'barobar', 'shivay', 'madhe', 'var', 'pasun',
-            'chya', 'pudhe', 'maghe', 'varti', 'khali', 'jevan', 'kaam'
+            'chya', 'pudhe', 'maghe', 'varti', 'khali', 'jevan', 'kaam',
+            'shikat', 'programming', 'computer', 'software', 'engineering'
         ]
         
         # Marathi phrases that are strong indicators
         marathi_phrases = [
             'tumhi kasa ahat', 'tumhi kase ahat', 'kasa ahat', 'kase ahat',
             'majhe nav', 'maza nav', 'tumche nav', 'dhanyawad tumhi',
-            'namaskar tumhi', 'maaf kara', 'krupa kara'
+            'namaskar tumhi', 'maaf kara', 'krupa kara', 'programming shikat',
+            'mala programming shikayche', 'mi programming shikto', 'computer chalav'
         ]
         
         text_lower = text.lower().strip()
@@ -164,8 +203,395 @@ class BilingualTranslationService:
         logger.info("Defaulting to English")
         return 'en'
     
+    def advanced_language_detection(self, text: str) -> str:
+        """Advanced language detection using multiple methods"""
+        logger.info(f"Advanced language detection for: {text[:50]}...")
+        
+        # Method 1: Check for Devanagari script
+        devanagari_pattern = re.compile(r'[\u0900-\u097F]')
+        if devanagari_pattern.search(text):
+            logger.info("Detected Marathi (Devanagari script)")
+            return 'mr'
+        
+        # Method 2: Use langdetect library if available
+        if LANGDETECT_AVAILABLE:
+            try:
+                detected = detect(text)
+                if detected in ['hi', 'mr']:  # Hindi/Marathi often confused
+                    logger.info(f"langdetect suggests: {detected}, checking for Marathi patterns")
+                    # Additional Marathi-specific check
+                    marathi_indicators = ['kasa', 'ahat', 'namaskar', 'dhanyawad', 'tumhi', 'majhe', 'ahe', 'aahe']
+                    text_lower = text.lower()
+                    for indicator in marathi_indicators:
+                        if indicator in text_lower:
+                            logger.info(f"Found Marathi indicator: {indicator}")
+                            return 'mr'
+                    return 'mr' if detected == 'mr' else 'en'
+                elif detected == 'en':
+                    return 'en'
+            except Exception as e:
+                logger.warning(f"langdetect failed: {e}")
+        
+        # Method 3: Enhanced pattern matching (fallback)
+        return self.detect_language(text)
+
+    def comprehensive_transliteration(self, text: str) -> list:
+        """Generate multiple transliteration variants"""
+        variants = [text]  # Original text
+        
+        # Method 1: Indic transliteration
+        if INDIC_AVAILABLE:
+            try:
+                # Try multiple schemes
+                schemes = [
+                    (sanscript.ITRANS, sanscript.DEVANAGARI),
+                    (sanscript.HK, sanscript.DEVANAGARI),
+                    (sanscript.VELTHUIS, sanscript.DEVANAGARI),
+                    (sanscript.BARAHA, sanscript.DEVANAGARI)
+                ]
+                
+                for src_scheme, dest_scheme in schemes:
+                    try:
+                        converted = transliterate(text, src_scheme, dest_scheme)
+                        if converted and converted != text and converted not in variants:
+                            variants.append(converted)
+                            logger.info(f"Transliterated: {text} -> {converted}")
+                    except:
+                        continue
+            except Exception as e:
+                logger.warning(f"Indic transliteration failed: {e}")
+        
+        # Method 2: Manual mapping for common words
+        manual_converted = self.romanized_to_devanagari(text)
+        if manual_converted != text and manual_converted not in variants:
+            variants.append(manual_converted)
+        
+        return variants
+
     def romanized_to_devanagari(self, text: str) -> str:
-        """Convert common romanized Marathi words to Devanagari for better API translation"""
+        """Convert romanized Marathi to Devanagari using multiple methods"""
+        try:
+            if INDIC_AVAILABLE:
+                # Use proper Indic transliteration
+                converted = transliterate(text, sanscript.ITRANS, sanscript.DEVANAGARI)
+                if converted and converted != text:
+                    logger.info(f"Transliterated '{text}' to '{converted}'")
+                    return converted
+        except Exception as e:
+            logger.warning(f"Indic transliteration failed: {e}")
+        
+        # Enhanced manual mapping with comprehensive coverage
+        romanized_to_devanagari_map = {
+            # Common greetings
+            'namaskar': 'नमस्कार', 'namaste': 'नमस्ते', 'dhanyawad': 'धन्यवाद',
+            # Personal info
+            'majhe nav': 'माझे नाव', 'maza nav': 'माझं नाव', 'tumche nav': 'तुमचं नाव',
+            # Questions
+            'tumhi kasa ahat': 'तुम्ही कसे आहात', 'kasa ahat': 'कसे आहात',
+            # Actions
+            'mi programming shikat ahe': 'मी प्रोग्रामिंग शिकत आहे',
+            'programming shikat': 'प्रोग्रामिंग शिकत',
+            # Basic words
+            'aahe': 'आहे', 'ahe': 'आहे', 'ahat': 'आहात', 'kasa': 'कसा', 'kay': 'काय',
+            'tumhi': 'तुम्ही', 'mi': 'मी', 'mala': 'मला', 'hoye': 'होय', 'nahi': 'नाही',
+            # Tech terms
+            'programming': 'प्रोग्रामिंग', 'computer': 'संगणक', 'software': 'सॉफ्टवेअर'
+        }
+        
+        converted_text = text.lower()
+        sorted_map = sorted(romanized_to_devanagari_map.items(), key=lambda x: len(x[0]), reverse=True)
+        
+        for roman, devanagari in sorted_map:
+            converted_text = converted_text.replace(roman, devanagari)
+        
+        return converted_text
+
+    def translate_with_multiple_variants(self, text, source_lang, target_lang):
+        """
+        Try all available translation methods and return the best result
+        """
+        translations = []
+        
+        # Method 1: GoogleTrans library (best for Marathi)
+        if GOOGLETRANS_AVAILABLE:
+            try:
+                result = self.translate_with_googletrans(text, source_lang, target_lang)
+                if result and result.lower().strip() != text.lower().strip():
+                    translations.append(('googletrans', result))
+                    logger.info(f"GoogleTrans variant: {result}")
+            except Exception as e:
+                logger.warning(f"GoogleTrans variant failed: {e}")
+        
+        # Method 2: Deep Translator
+        if DEEP_TRANSLATOR_AVAILABLE:
+            try:
+                result = self.translate_with_deep_translator(text, source_lang, target_lang)
+                if result and result.lower().strip() != text.lower().strip():
+                    translations.append(('deep_translator', result))
+                    logger.info(f"DeepTranslator variant: {result}")
+            except Exception as e:
+                logger.warning(f"DeepTranslator variant failed: {e}")
+        
+        # Method 3: Microsoft Translator
+        try:
+            result = self.translate_with_microsoft(text, source_lang, target_lang)
+            if result and result.lower().strip() != text.lower().strip():
+                translations.append(('microsoft', result))
+                logger.info(f"Microsoft variant: {result}")
+        except Exception as e:
+            logger.warning(f"Microsoft variant failed: {e}")
+        
+        # Method 4: Yandex Translator
+        try:
+            result = self.translate_with_yandex(text, source_lang, target_lang)
+            if result and result.lower().strip() != text.lower().strip():
+                translations.append(('yandex', result))
+                logger.info(f"Yandex variant: {result}")
+        except Exception as e:
+            logger.warning(f"Yandex variant failed: {e}")
+        
+        # Method 5: Bing Translator
+        try:
+            result = self.translate_with_bing(text, source_lang, target_lang)
+            if result and result.lower().strip() != text.lower().strip():
+                translations.append(('bing', result))
+                logger.info(f"Bing variant: {result}")
+        except Exception as e:
+            logger.warning(f"Bing variant failed: {e}")
+        
+        # Method 6: Apertium
+        try:
+            result = self.translate_with_apertium(text, source_lang, target_lang)
+            if result and result.lower().strip() != text.lower().strip():
+                translations.append(('apertium', result))
+                logger.info(f"Apertium variant: {result}")
+        except Exception as e:
+            logger.warning(f"Apertium variant failed: {e}")
+        
+        # Method 7: MyMemory API
+        try:
+            result = self.translate_with_mymemory(text, source_lang, target_lang)
+            if result and result.lower().strip() != text.lower().strip():
+                translations.append(('mymemory', result))
+                logger.info(f"MyMemory variant: {result}")
+        except Exception as e:
+            logger.warning(f"MyMemory variant failed: {e}")
+        
+        # Method 8: Google Free
+        try:
+            result = self.translate_with_google_free(text, source_lang, target_lang)
+            if result and result.lower().strip() != text.lower().strip():
+                translations.append(('google_free', result))
+                logger.info(f"Google Free variant: {result}")
+        except Exception as e:
+            logger.warning(f"Google Free variant failed: {e}")
+        
+        # Method 9: Lingva Translate
+        try:
+            result = self.translate_with_lingva(text, source_lang, target_lang)
+            if result and result.lower().strip() != text.lower().strip():
+                translations.append(('lingva', result))
+                logger.info(f"Lingva variant: {result}")
+        except Exception as e:
+            logger.warning(f"Lingva variant failed: {e}")
+        
+        # Method 10: LibreTranslate
+        try:
+            result = self.translate_with_libre(text, source_lang, target_lang)
+            if result and result.lower().strip() != text.lower().strip():
+                translations.append(('libre', result))
+                logger.info(f"LibreTranslate variant: {result}")
+        except Exception as e:
+            logger.warning(f"LibreTranslate variant failed: {e}")
+        
+        if not translations:
+            logger.warning("All translation methods failed")
+            return None
+        
+        # For Marathi, prioritize GoogleTrans and Deep Translator results
+        if source_lang == 'mr' or target_lang == 'mr':
+            for method, result in translations:
+                if method in ['googletrans', 'deep_translator', 'microsoft']:
+                    logger.info(f"Selected {method} for Marathi translation: {result}")
+                    return result
+        
+        # Return the first successful translation
+        best_result = translations[0][1]
+        logger.info(f"Selected best translation from {translations[0][0]}: {best_result}")
+        return best_result
+
+    def translate_with_microsoft(self, text: str, source_lang: str, target_lang: str) -> str:
+        """Translate using Microsoft Translator (free tier)"""
+        try:
+            # Microsoft Translator endpoint (no API key required for basic usage)
+            url = "https://api.cognitive.microsofttranslator.com/translate"
+            params = {
+                'api-version': '3.0',
+                'from': source_lang,
+                'to': target_lang
+            }
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            data = [{'text': text}]
+            
+            response = session.post(url, params=params, headers=headers, json=data, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result and len(result) > 0 and 'translations' in result[0]:
+                    translation = result[0]['translations'][0]['text']
+                    logger.info(f"Microsoft Translator successful: {translation}")
+                    return translation
+            
+            logger.warning("Microsoft Translator API failed")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Microsoft Translator error: {e}")
+            return None
+
+    def translate_with_yandex(self, text: str, source_lang: str, target_lang: str) -> str:
+        """Translate using Yandex Translate (free service)"""
+        try:
+            # Yandex Translate free endpoint
+            url = "https://translate.yandex.net/api/v1.5/tr/translate"
+            params = {
+                'key': 'free',  # Some free keys available
+                'text': text,
+                'lang': f'{source_lang}-{target_lang}',
+                'format': 'plain'
+            }
+            
+            response = session.get(url, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                # Parse XML response
+                import xml.etree.ElementTree as ET
+                root = ET.fromstring(response.text)
+                if root.tag == 'Translation' and root.text:
+                    translation = root.text
+                    logger.info(f"Yandex Translate successful: {translation}")
+                    return translation
+            
+            logger.warning("Yandex Translate API failed")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Yandex Translate error: {e}")
+            return None
+
+    def translate_with_bing(self, text: str, source_lang: str, target_lang: str) -> str:
+        """Translate using Bing Translator (free web service)"""
+        try:
+            # Bing Translator web endpoint
+            url = "https://www.bing.com/translator/api/Translate/TranslateArray"
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Content-Type': 'application/json'
+            }
+            
+            data = {
+                'fromLang': source_lang,
+                'toLang': target_lang,
+                'texts': [text]
+            }
+            
+            response = session.post(url, headers=headers, json=data, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result and len(result) > 0 and 'text' in result[0]:
+                    translation = result[0]['text']
+                    logger.info(f"Bing Translator successful: {translation}")
+                    return translation
+            
+            logger.warning("Bing Translator API failed")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Bing Translator error: {e}")
+            return None
+
+    def translate_with_apertium(self, text: str, source_lang: str, target_lang: str) -> str:
+        """Translate using Apertium (free open-source)"""
+        try:
+            # Apertium API
+            url = "https://apertium.org/apy/translate"
+            
+            # Map language codes for Apertium
+            lang_map = {'mr': 'hi', 'en': 'eng'}  # Apertium uses hi for Marathi-like languages
+            src_code = lang_map.get(source_lang, source_lang)
+            tgt_code = lang_map.get(target_lang, target_lang)
+            
+            params = {
+                'q': text,
+                'langpair': f'{src_code}|{tgt_code}'
+            }
+            
+            response = session.get(url, params=params, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'translatedText' in result:
+                    translation = result['translatedText']
+                    logger.info(f"Apertium successful: {translation}")
+                    return translation
+            
+            logger.warning("Apertium API failed")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Apertium error: {e}")
+            return None
+
+    def translate_with_multiple_variants(self, text: str, source_lang: str, target_lang: str) -> str:
+        """Try translation with multiple text variants"""
+        variants = self.comprehensive_transliteration(text)
+        
+        translation_methods = [
+            self.translate_with_googletrans,
+            self.translate_with_deep_translator,
+            self.translate_with_google_free,
+            self.translate_with_mymemory,
+            self.translate_with_microsoft,
+            self.translate_with_bing,
+            self.translate_with_lingva,
+            self.translate_with_libre,
+            self.translate_with_apertium
+        ]
+        
+        for variant in variants:
+            logger.info(f"Trying translation variant: {variant}")
+            
+            for method in translation_methods:
+                try:
+                    result = method(variant, source_lang, target_lang)
+                    if (result and 
+                        result.strip() != variant.strip() and 
+                        len(result.strip()) > 0 and
+                        not any(error_phrase in result.lower() for error_phrase in 
+                               ['error', 'failed', 'please select', 'distinct languages'])):
+                        logger.info(f"Successful translation: {variant} -> {result}")
+                        return result
+                except Exception as e:
+                    logger.warning(f"Translation method failed: {e}")
+                    continue
+        
+        return None
+        """Convert romanized Marathi to Devanagari using proper library"""
+        try:
+            if INDIC_AVAILABLE:
+                # Use proper Indic transliteration
+                converted = transliterate(text, sanscript.ITRANS, sanscript.DEVANAGARI)
+                if converted and converted != text:
+                    logger.info(f"Transliterated '{text}' to '{converted}'")
+                    return converted
+        except Exception as e:
+            logger.warning(f"Indic transliteration failed: {e}")
+        
+        # Fallback to manual mapping
         romanized_to_devanagari_map = {
             'namaskar': 'नमस्कार',
             'namaste': 'नमस्ते', 
@@ -179,6 +605,8 @@ class BilingualTranslationService:
             'mi kaam karat ahe': 'मी काम करत आहे',
             'mi school la jatoy': 'मी शाळेत जातोय',
             'mi ghari jatoy': 'मी घरी जातोय',
+            'mala programming shikayche ahe': 'मला प्रोग्रामिंग शिकायचे आहे',
+            'programming shikat': 'प्रोग्रामिंग शिकत',
             'aahe': 'आहे',
             'ahe': 'आहे',
             'ahat': 'आहात',
@@ -203,6 +631,9 @@ class BilingualTranslationService:
             'engineer': 'अभियंता',
             'doctor': 'डॉक्टर',
             'teacher': 'शिक्षक',
+            'programming': 'प्रोग्रामिंग',
+            'computer': 'संगणक',
+            'software': 'सॉफ्टवेअर',
             'tumhi': 'तुम्ही',
             'tumi': 'तुमी',
             'mi': 'मी',
@@ -221,7 +652,9 @@ class BilingualTranslationService:
             'karat': 'करत',
             'khattoy': 'खातोय',
             'pitoy': 'पितोय',
-            'boltoy': 'बोलतोय'
+            'boltoy': 'बोलतोय',
+            'shikat': 'शिकत',
+            'shikayche': 'शिकायचे'
         }
         
         converted_text = text.lower()
@@ -232,6 +665,62 @@ class BilingualTranslationService:
             converted_text = converted_text.replace(roman, devanagari)
         
         return converted_text
+
+    def translate_with_googletrans(self, text: str, source_lang: str, target_lang: str) -> str:
+        """Translate using googletrans library for better Marathi support"""
+        try:
+            if not GOOGLETRANS_AVAILABLE:
+                return None
+                
+            translator = GoogleTranslator2()
+            
+            # Map language codes
+            lang_map = {'mr': 'mr', 'en': 'en'}
+            source_code = lang_map.get(source_lang, source_lang)
+            target_code = lang_map.get(target_lang, target_lang)
+            
+            logger.info(f"GoogleTrans API call: {source_code} -> {target_code}")
+            
+            result = translator.translate(text, src=source_code, dest=target_code)
+            
+            if result and result.text and result.text.strip() != text.strip():
+                translation = result.text
+                logger.info(f"GoogleTrans successful: {translation}")
+                return translation
+            
+            logger.warning("GoogleTrans API failed or returned same text")
+            return None
+            
+        except Exception as e:
+            logger.error(f"GoogleTrans API error: {e}")
+            return None
+
+    def translate_with_deep_translator(self, text: str, source_lang: str, target_lang: str) -> str:
+        """Translate using deep-translator library"""
+        try:
+            if not DEEP_TRANSLATOR_AVAILABLE:
+                return None
+                
+            # Map language codes
+            lang_map = {'mr': 'mr', 'en': 'en'}
+            source_code = lang_map.get(source_lang, source_lang)
+            target_code = lang_map.get(target_lang, target_lang)
+            
+            logger.info(f"DeepTranslator API call: {source_code} -> {target_code}")
+            
+            translator = GoogleTranslator(source=source_code, target=target_code)
+            result = translator.translate(text)
+            
+            if result and result.strip() != text.strip():
+                logger.info(f"DeepTranslator successful: {result}")
+                return result
+            
+            logger.warning("DeepTranslator API failed or returned same text")
+            return None
+            
+        except Exception as e:
+            logger.error(f"DeepTranslator API error: {e}")
+            return None
 
     def translate_with_mymemory(self, text: str, source_lang: str, target_lang: str) -> str:
         """Translate using MyMemory API with enhanced Marathi support"""
@@ -469,7 +958,11 @@ class BilingualTranslationService:
             'how much?': 'किती?',
             'today': 'आज',
             'tomorrow': 'उद्या',
-            'yesterday': 'काल'
+            'yesterday': 'काल',
+            'i want to learn programming': 'मला प्रोग्रामिंग शिकायचे आहे',
+            'i love programming': 'मला प्रोग्रामिंग आवडते',
+            'computer': 'संगणक',
+            'software': 'सॉफ्टवेअर'
         }
         
         # Marathi to English dictionary
@@ -480,6 +973,8 @@ class BilingualTranslationService:
             'मी काम करत आहे': 'I am working',
             'मी शाळेत जातोय': 'I am going to school',
             'मी घरी जातोय': 'I am going home',
+            'मला प्रोग्रामिंग शिकायचे आहे': 'I want to learn programming',
+            'मला प्रोग्रामिंग आवडते': 'I love programming',
             'सुप्रभात': 'good morning',
             'शुभ संध्या': 'good evening',
             'शुभ रात्री': 'good night',
@@ -508,7 +1003,9 @@ class BilingualTranslationService:
             'किती?': 'how much?',
             'आज': 'today',
             'उद्या': 'tomorrow',
-            'काल': 'yesterday'
+            'काल': 'yesterday',
+            'संगणक': 'computer',
+            'सॉफ्टवेअर': 'software'
         }
         
         # Romanized Marathi to English
@@ -529,6 +1026,10 @@ class BilingualTranslationService:
             'mi school la jatoy': 'I am going to school',
             'mi ghari jatoy': 'I am going home',
             'mi khana khattoy': 'I am eating food',
+            'mala programming shikayche ahe': 'I want to learn programming',
+            'mala programming shikayche': 'I want to learn programming',
+            'mi programming shikat ahe': 'I am learning programming',
+            'programming shikat': 'learning programming',
             'pani': 'water',
             'anna': 'food',
             'khana': 'food',
@@ -606,7 +1107,12 @@ class BilingualTranslationService:
             'chaltoy': 'walking',
             'dhavttoy': 'running',
             'hasttoy': 'laughing',
-            'rudttoy': 'crying'
+            'rudttoy': 'crying',
+            'shikat': 'learning',
+            'shikayche': 'want to learn',
+            'computer': 'computer',
+            'software': 'software',
+            'programming': 'programming'
         }
         
         # English to romanized Marathi  
@@ -673,43 +1179,50 @@ class BilingualTranslationService:
             if text_lower in romanized_mr_to_en:
                 return romanized_mr_to_en[text_lower]
             
-            # Try partial matches for Devanagari
-            for mar_phrase, eng_phrase in mr_to_en.items():
-                if mar_phrase in text:
-                    return eng_phrase
+            # Try partial matches for Devanagari (only for longer phrases)
+            if len(text.split()) >= 2:
+                for mar_phrase, eng_phrase in mr_to_en.items():
+                    if mar_phrase in text and len(mar_phrase.split()) >= 2:
+                        return eng_phrase
             
-            # Try partial matches for romanized (longer phrases first)
-            sorted_romanized = sorted(romanized_mr_to_en.items(), key=lambda x: len(x[0]), reverse=True)
-            for rom_phrase, eng_phrase in sorted_romanized:
-                if rom_phrase in text_lower:
-                    return eng_phrase
+            # Try partial matches for romanized (longer phrases first, minimum 2 words)
+            if len(text_lower.split()) >= 2:
+                sorted_romanized = sorted(romanized_mr_to_en.items(), key=lambda x: len(x[0]), reverse=True)
+                for rom_phrase, eng_phrase in sorted_romanized:
+                    if len(rom_phrase.split()) >= 2 and rom_phrase in text_lower:
+                        return eng_phrase
             
-            # Try word-by-word translation for romanized Marathi
+            # For phrases with 3+ words, try word-by-word only if we can translate majority
             words = text_lower.split()
-            translated_words = []
-            found_translations = 0
+            if len(words) >= 3:
+                translated_words = []
+                found_translations = 0
+                
+                for word in words:
+                    if word in romanized_mr_to_en:
+                        translated_words.append(romanized_mr_to_en[word])
+                        found_translations += 1
+                    else:
+                        # Try partial matching for compound words (but be stricter)
+                        found_partial = False
+                        for rom_word, eng_word in romanized_mr_to_en.items():
+                            if len(rom_word) >= 4 and (word in rom_word or rom_word in word):
+                                translated_words.append(eng_word)
+                                found_partial = True
+                                found_translations += 1
+                                break
+                        if not found_partial:
+                            translated_words.append(word)  # Keep untranslated word
+                
+                # Return translation only if we found at least 70% of words
+                if found_translations > 0 and found_translations >= len(words) * 0.7:
+                    result = ' '.join(translated_words)
+                    logger.info(f"Word-by-word translation: {text} -> {result} ({found_translations}/{len(words)} words translated)")
+                    return result
             
-            for word in words:
-                if word in romanized_mr_to_en:
-                    translated_words.append(romanized_mr_to_en[word])
-                    found_translations += 1
-                else:
-                    # Try partial matching for compound words
-                    found_partial = False
-                    for rom_word, eng_word in romanized_mr_to_en.items():
-                        if word in rom_word or rom_word in word:
-                            translated_words.append(eng_word)
-                            found_partial = True
-                            found_translations += 1
-                            break
-                    if not found_partial:
-                        translated_words.append(word)  # Keep untranslated word
-            
-            # Return translation only if we found a significant portion (at least 50% of words)
-            if found_translations > 0 and found_translations >= len(words) * 0.5:
-                result = ' '.join(translated_words)
-                logger.info(f"Word-by-word translation: {text} -> {result} ({found_translations} words translated)")
-                return result
+            # If dictionary fails, return None to allow API fallback
+            logger.info(f"Dictionary translation insufficient for: {text}, falling back to APIs")
+            return None
         
         return None
     
@@ -721,15 +1234,14 @@ class BilingualTranslationService:
             if not text:
                 raise ValueError("Empty text provided")
             
-            # Auto-detect source language if needed
+            # Auto-detect source language with advanced detection
             if source_lang == "auto":
-                detected_lang = self.detect_language(text)
+                detected_lang = self.advanced_language_detection(text)
             elif source_lang == "English":
                 detected_lang = 'en'
             elif source_lang == "Marathi":
                 detected_lang = 'mr'
             else:
-                # User explicitly provided 'en' or 'mr'
                 detected_lang = source_lang
             
             # Auto-determine target language (always opposite of source if auto)
@@ -771,55 +1283,18 @@ class BilingualTranslationService:
                     'method': 'dictionary'
                 }
             
-            # Fallback to multiple free APIs for phrases not in dictionary
-            logger.info("Dictionary translation not found, trying API fallbacks...")
+            # If dictionary fails, try comprehensive translation with multiple variants
+            logger.info("Dictionary translation not found, trying comprehensive API approach...")
             
-            # Try MyMemory API first
-            mymemory_translation = self.translate_with_mymemory(text, detected_lang, auto_target)
-            if mymemory_translation and mymemory_translation.lower().strip() != text.lower().strip():
-                self.translation_cache[cache_key] = mymemory_translation
-                logger.info(f"MyMemory translation successful: {mymemory_translation}")
+            comprehensive_translation = self.translate_with_multiple_variants(text, detected_lang, auto_target)
+            if comprehensive_translation:
+                self.translation_cache[cache_key] = comprehensive_translation
+                logger.info(f"Comprehensive translation successful: {comprehensive_translation}")
                 return {
-                    'translated_text': mymemory_translation,
+                    'translated_text': comprehensive_translation,
                     'source_language': detected_lang,
                     'target_language': auto_target,
-                    'method': 'mymemory_api'
-                }
-            
-            # Try Google Translate (free) as second option
-            google_translation = self.translate_with_google_free(text, detected_lang, auto_target)
-            if google_translation and google_translation.lower().strip() != text.lower().strip():
-                self.translation_cache[cache_key] = google_translation
-                logger.info(f"Google Translate successful: {google_translation}")
-                return {
-                    'translated_text': google_translation,
-                    'source_language': detected_lang,
-                    'target_language': auto_target,
-                    'method': 'google_free'
-                }
-            
-            # Try Lingva Translate as third option
-            lingva_translation = self.translate_with_lingva(text, detected_lang, auto_target)
-            if lingva_translation and lingva_translation.lower().strip() != text.lower().strip():
-                self.translation_cache[cache_key] = lingva_translation
-                logger.info(f"Lingva Translate successful: {lingva_translation}")
-                return {
-                    'translated_text': lingva_translation,
-                    'source_language': detected_lang,
-                    'target_language': auto_target,
-                    'method': 'lingva_translate'
-                }
-            
-            # Try LibreTranslate as fourth option
-            libre_translation = self.translate_with_libre(text, detected_lang, auto_target)
-            if libre_translation and libre_translation.lower().strip() != text.lower().strip():
-                self.translation_cache[cache_key] = libre_translation
-                logger.info(f"LibreTranslate successful: {libre_translation}")
-                return {
-                    'translated_text': libre_translation,
-                    'source_language': detected_lang,
-                    'target_language': auto_target,
-                    'method': 'libretranslate'
+                    'method': 'comprehensive_api'
                 }
             
             # If all APIs fail, provide a helpful fallback message
