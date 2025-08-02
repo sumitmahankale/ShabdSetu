@@ -2,7 +2,8 @@
 ## Bidirectional English-Marathi Speech Translator
 
 **ShabdSetu** (meaning "bridge of words" in Marathi) is a comprehensive real-time speech-to-speech translation application that provides seamless bidirectional translation between English and Marathi with intelligent language detection and one-button operation.
-
+<br><br>
+<img width="1917" height="902" alt="image" src="https://github.com/user-attachments/assets/768b348d-d695-469f-9fd2-be12cb2b5f85" />
 ## Key Features
 
 ### Core Translation Capabilities
