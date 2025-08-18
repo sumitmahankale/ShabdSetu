@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Volume2, VolumeX, Languages } from 'lucide-react';
+import { Mic, MicOff, Volume2, Languages } from 'lucide-react';
 
 function App() {
   const [isListening, setIsListening] = useState(false);
@@ -9,31 +9,48 @@ function App() {
   const [waterScale, setWaterScale] = useState(1);
   const [ripples, setRipples] = useState([]);
   const recognitionRef = useRef(null);
+  const recognitionResolveRef = useRef(null);
+  const [detectedSource, setDetectedSource] = useState('');
+  const [translationMethod, setTranslationMethod] = useState('');
+  const attemptingLangsRef = useRef([]);
   
   // Initialize speech recognition
   useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = false;
-      recognitionRef.current.interimResults = false;
-      
-      recognitionRef.current.onstart = () => {
-        setIsListening(true);
-        setWaterScale(0.8); // Shrink when speaking
-        createRipple();
-      };
-      
-      recognitionRef.current.onend = () => {
-        setIsListening(false);
-        setWaterScale(1); // Return to normal size
-      };
-      
-      recognitionRef.current.onresult = async (event) => {
-        const transcript = event.results[0][0].transcript;
-        await translateText(transcript);
-      };
-    }
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SpeechRecognition();
+    rec.continuous = false;
+    rec.interimResults = false;
+
+    rec.onstart = () => {
+      setIsListening(true);
+      setWaterScale(0.8);
+      createRipple();
+    };
+    rec.onend = () => {
+      setIsListening(false);
+      setWaterScale(1);
+      // If ended without a result and we are in multi-attempt mode, trigger next
+      if (recognitionResolveRef.current) {
+        recognitionResolveRef.current(''); // resolve empty to continue flow
+        recognitionResolveRef.current = null;
+      }
+    };
+    rec.onerror = (e) => {
+      console.warn('Speech recognition error', e);
+      if (recognitionResolveRef.current) {
+        recognitionResolveRef.current('');
+        recognitionResolveRef.current = null;
+      }
+    };
+    rec.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      if (recognitionResolveRef.current) {
+        recognitionResolveRef.current(transcript);
+        recognitionResolveRef.current = null;
+      }
+    };
+    recognitionRef.current = rec;
   }, []);
 
   // Create ripple effect
@@ -58,8 +75,10 @@ function App() {
           target_language: 'auto' 
         })
       });
-      const data = await response.json();
-      setTranslatedText(data.translated_text);
+  const data = await response.json();
+  setTranslatedText(data.translated_text);
+  setDetectedSource(data.source_language || '');
+  setTranslationMethod(data.translation_method || '');
       
       // Only speak if translation was successful and not a fallback message
       if (data.translated_text && !data.translated_text.includes('Translation not available')) {
@@ -83,8 +102,9 @@ function App() {
       
       // Set language based on target language
       if (targetLang === 'mr') {
-        utterance.lang = 'hi-IN'; // Use Hindi for better Marathi support
-        utterance.rate = 0.8; // Slower rate for clarity
+        // Attempt Marathi locale; if unsupported browser may fallback automatically
+        utterance.lang = 'mr-IN';
+        utterance.rate = 0.85; // Slightly slower for clarity
       } else {
         utterance.lang = 'en-US';
         utterance.rate = 0.9;
@@ -103,14 +123,7 @@ function App() {
         setIsSpeaking(false);
         
         // Fallback: try with different language
-        if (targetLang === 'mr') {
-          setTimeout(() => {
-            const fallbackUtterance = new SpeechSynthesisUtterance(text);
-            fallbackUtterance.lang = 'en-US';
-            fallbackUtterance.rate = 0.8;
-            speechSynthesis.speak(fallbackUtterance);
-          }, 100);
-        }
+  // No Hindi fallback – only English if Marathi completely fails can be added explicitly by user
       };
       
       console.log(`Speaking: "${text}" in language: ${utterance.lang}`);
@@ -121,11 +134,33 @@ function App() {
     }
   };
 
-  // Start listening
-  const startListening = () => {
-    if (recognitionRef.current) {
-      recognitionRef.current.lang = 'en-US';
+  // Helper: single recognition attempt for one language returning transcript
+  const recognizeOnce = (lang) => new Promise((resolve) => {
+    if (!recognitionRef.current) return resolve('');
+    recognitionResolveRef.current = resolve;
+    try {
+      recognitionRef.current.lang = lang;
       recognitionRef.current.start();
+    } catch (e) {
+      console.warn('Failed to start recognition for', lang, e);
+      resolve('');
+    }
+  });
+
+  const languageAttempts = ['mr-IN','en-US'];
+
+  const startListening = async () => {
+    if (!recognitionRef.current || isListening) return;
+    attemptingLangsRef.current = [...languageAttempts];
+    setTranslatedText('');
+    setDetectedSource('');
+    setTranslationMethod('');
+    for (const lang of languageAttempts) {
+      const transcript = await recognizeOnce(lang);
+      if (!transcript) continue; // try next
+      await translateText(transcript);
+      // Break if not fallback (avoid stale state by checking last translationMethod via ref after small delay)
+      if (translationMethod !== 'fallback') break;
     }
   };
 
@@ -212,11 +247,11 @@ function App() {
           <h1 className="text-4xl font-bold text-white mb-4 bg-gradient-to-r from-cyan-300 to-blue-300 bg-clip-text text-transparent">
             ShabdSetu
           </h1>
-          <p className="text-white/80 text-lg mb-4">
-            {isListening ? 'Listening...' : 
-             isSpeaking ? 'Speaking...' : 
-             isLoading ? 'Translating...' : 
-             'Tap the orb to speak'}
+          <p className="text-white/80 text-lg mb-2">
+            {isListening ? 'Listening...' : isSpeaking ? 'Speaking...' : isLoading ? 'Translating...' : 'Tap the orb to speak'}
+          </p>
+          <p className="text-white/60 text-sm h-5">
+            {detectedSource && `Detected: ${detectedSource.toUpperCase()} (${translationMethod})`}
           </p>
           
           {/* Translated text display */}

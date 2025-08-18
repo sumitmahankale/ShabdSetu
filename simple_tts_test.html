@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple TTS Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+        .result { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Simple Text-to-Speech Test</h1>
+    
+    <div>
+        <button onclick="testEnglish()">🔊 Test English</button>
+        <button onclick="testMarathi()">🔊 Test Marathi</button>
+        <button onclick="listVoices()">📋 List Voices</button>
+        <button onclick="testTranslation()">🔄 Test Translation + TTS</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script>
+        function log(message) {
+            const results = document.getElementById('results');
+            results.innerHTML += `<div class="result">${new Date().toLocaleTimeString()}: ${message}</div>`;
+            console.log(message);
+        }
+        
+        function testEnglish() {
+            log('Testing English TTS...');
+            if (!speechSynthesis) {
+                log('❌ Speech synthesis not supported');
+                return;
+            }
+            
+            const utterance = new SpeechSynthesisUtterance('Hello, this is an English test');
+            utterance.lang = 'en-US';
+            
+            utterance.onstart = () => log('✅ English speech started');
+            utterance.onend = () => log('✅ English speech completed');
+            utterance.onerror = (e) => log(`❌ English speech error: ${e.error}`);
+            
+            speechSynthesis.speak(utterance);
+        }
+        
+        function testMarathi() {
+            log('Testing Marathi TTS...');
+            if (!speechSynthesis) {
+                log('❌ Speech synthesis not supported');
+                return;
+            }
+            
+            const utterance = new SpeechSynthesisUtterance('नमस्कार');
+            utterance.lang = 'mr-IN';
+            
+            // Try to find Hindi voice
+            const voices = speechSynthesis.getVoices();
+            const hindiVoice = voices.find(v => v.lang.includes('hi') || v.lang.includes('mr'));
+            if (hindiVoice) {
+                utterance.voice = hindiVoice;
+                log(`Using voice: ${hindiVoice.name} (${hindiVoice.lang})`);
+            } else {
+                log('⚠️ No Hindi/Marathi voice found, using default');
+            }
+            
+            utterance.onstart = () => log('✅ Marathi speech started');
+            utterance.onend = () => log('✅ Marathi speech completed');
+            utterance.onerror = (e) => log(`❌ Marathi speech error: ${e.error}`);
+            
+            speechSynthesis.speak(utterance);
+        }
+        
+        function listVoices() {
+            const voices = speechSynthesis.getVoices();
+            log(`Found ${voices.length} voices:`);
+            
+            voices.forEach((voice, i) => {
+                const isGood = voice.lang.includes('en') || voice.lang.includes('hi') || voice.lang.includes('mr');
+                log(`${i}: ${voice.name} (${voice.lang}) ${isGood ? '✅' : ''}`);
+            });
+        }
+        
+        async function testTranslation() {
+            log('Testing translation + TTS...');
+            
+            try {
+                const response = await fetch('http://localhost:8003/translate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: 'Hello',
+                        source_language: 'auto',
+                        target_language: 'auto'
+                    })
+                });
+                
+                const result = await response.json();
+                log(`Translation: ${result.original_text} → ${result.translated_text}`);
+                
+                // Now test TTS with the translation
+                const utterance = new SpeechSynthesisUtterance(result.translated_text);
+                utterance.lang = 'mr-IN';
+                
+                utterance.onstart = () => log('✅ Translation TTS started');
+                utterance.onend = () => log('✅ Translation TTS completed');
+                utterance.onerror = (e) => log(`❌ Translation TTS error: ${e.error}`);
+                
+                speechSynthesis.speak(utterance);
+                
+            } catch (error) {
+                log(`❌ Translation failed: ${error.message}`);
+            }
+        }
+        
+        // Initialize voices
+        window.addEventListener('load', () => {
+            log('Page loaded');
+            
+            // Wait for voices to load
+            if (speechSynthesis.getVoices().length === 0) {
+                speechSynthesis.onvoiceschanged = () => {
+                    log('Voices loaded');
+                    listVoices();
+                };
+            } else {
+                listVoices();
+            }
+        });
+    </script>
+</body>
+</html>
