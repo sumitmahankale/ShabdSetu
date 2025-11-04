@@ -21,6 +21,7 @@ function App() {
     return 'dark';
   });
   const [attempts, setAttempts] = useState([]);
+  const [languageMode, setLanguageMode] = useState('en'); // 'en' or 'mr' (removed 'auto')
 
   // Romanized Marathi clue words (subset of backend list)
   const romanMrClues = ['namaskar','majha','majhe','maza','nav','sumit','tumhi','kase','kasa','dhanyavad','dhanyawad','dhanyabad','pani','madat','aaj','udya','kal','sakal','ratri'];
@@ -37,14 +38,13 @@ function App() {
   const translateText = async (text, forcedSrc) => {
     setIsLoading(true);
     try {
-      let srcLang = forcedSrc || detectSource(text);
-      const singleWord = text.trim().split(/\s+/).length === 1;
+      // Determine source based on mode (only 'en' or 'mr')
+      let srcLang = languageMode;
+      
       const hasDevanagari = /[\u0900-\u097F]/.test(text);
-      const confident = hasDevanagari || (!singleWord);
-      // Force Marathi if recognition pass explicitly said so (forcedSrc === 'mr') even if no Devanagari (romanized)
-      if (forcedSrc === 'mr') srcLang = 'mr';
-      const source_language = hasDevanagari || forcedSrc === 'mr' ? 'Marathi' : (confident ? (srcLang === 'mr' ? 'Marathi' : 'English') : 'auto');
-      const target_language = (hasDevanagari || forcedSrc === 'mr') ? 'English' : (confident ? (srcLang === 'mr' ? 'English' : 'Marathi') : 'auto');
+      const source_language = (languageMode === 'mr' || hasDevanagari) ? 'Marathi' : 'English';
+      const target_language = (languageMode === 'mr' || hasDevanagari) ? 'English' : 'Marathi';
+      
       const response = await fetch(`http://localhost:8003/translate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -56,10 +56,17 @@ function App() {
       setTranslationMethod(data.translation_method || '');
       setAttempts(data.attempts || []);
       const tgtLangFinal = (data.target_language || (data.source_language === 'mr' ? 'en' : 'mr'));
-      const differentText = data.translated_text && data.translated_text.toLowerCase() !== text.toLowerCase();
-      const differentLang = data.source_language && tgtLangFinal && data.source_language !== tgtLangFinal;
-      const salvageMethod = data.translation_method && /mr-(word-dictionary|transliteration)/.test(data.translation_method);
-      if (data.translated_text && !data.translated_text.includes('Translation unavailable') && (differentText || differentLang || salvageMethod)) {
+      
+      // Always speak the translated text if translation was successful
+      console.log('Translation result:', {
+        original: text,
+        translated: data.translated_text,
+        source: data.source_language,
+        target: tgtLangFinal,
+        method: data.translation_method
+      });
+      
+      if (data.translated_text && !data.translated_text.includes('Translation unavailable')) {
         speakText(data.translated_text, tgtLangFinal);
       }
       return data.translation_method || '';
@@ -130,23 +137,65 @@ function App() {
 
   // (Removed old translateText implementation)
 
-  // Text to speech
+  // Text to speech with voice availability check
   const speakText = (text, targetLang = 'mr') => {
-    if ('speechSynthesis' in window && text) {
-      speechSynthesis.cancel();
-      setIsSpeaking(true);
+    if (!('speechSynthesis' in window) || !text) {
+      console.warn('Speech synthesis not supported or no text');
+      return;
+    }
+    
+    speechSynthesis.cancel();
+    setIsSpeaking(true);
+    
+    // Wait for voices to be loaded
+    const speak = () => {
       const utterance = new SpeechSynthesisUtterance(text);
       
       if (targetLang === 'mr') {
         utterance.lang = 'mr-IN';
         utterance.rate = 0.85;
+        
+        // Try to find a Marathi voice, fallback to Hindi or default
+        const voices = speechSynthesis.getVoices();
+        console.log('Available voices:', voices.map(v => `${v.name} (${v.lang})`));
+        
+        const marathiVoice = voices.find(v => v.lang.startsWith('mr'));
+        const hindiVoice = voices.find(v => v.lang.startsWith('hi'));
+        const englishVoice = voices.find(v => v.lang.startsWith('en'));
+        
+        if (marathiVoice) {
+          utterance.voice = marathiVoice;
+          console.log('Using Marathi voice:', marathiVoice.name);
+        } else if (hindiVoice) {
+          utterance.voice = hindiVoice;
+          utterance.lang = 'hi-IN';
+          console.log('Using Hindi voice (fallback):', hindiVoice.name);
+        } else if (englishVoice) {
+          utterance.voice = englishVoice;
+          utterance.lang = 'en-IN';
+          console.log('Using English-India voice (fallback):', englishVoice.name);
+        } else {
+          console.warn('No suitable voice found for Marathi, using default');
+        }
       } else {
         utterance.lang = 'en-US';
         utterance.rate = 0.9;
+        
+        // Select English voice
+        const voices = speechSynthesis.getVoices();
+        const englishVoice = voices.find(v => v.lang.startsWith('en'));
+        if (englishVoice) {
+          utterance.voice = englishVoice;
+          console.log('Using English voice:', englishVoice.name);
+        }
       }
       
-      utterance.volume = 0.8;
+      utterance.volume = 1.0; // Increased volume
       utterance.pitch = 1.0;
+      
+      utterance.onstart = () => {
+        console.log('Speech started:', text);
+      };
       
       utterance.onend = () => {
         setIsSpeaking(false);
@@ -160,9 +209,15 @@ function App() {
       
       console.log(`Speaking: "${text}" in language: ${utterance.lang}`);
       speechSynthesis.speak(utterance);
+    };
+    
+    // Ensure voices are loaded
+    if (speechSynthesis.getVoices().length > 0) {
+      speak();
     } else {
-      console.warn('Speech synthesis not supported');
-      setIsSpeaking(false);
+      speechSynthesis.onvoiceschanged = () => {
+        speak();
+      };
     }
   };
 
@@ -188,14 +243,25 @@ function App() {
     setDetectedSource('');
     setTranslationMethod('');
     setOriginalText('');
-    for (const lang of languageAttempts) {
-      const transcript = await recognizeOnce(lang);
-      if (!transcript) continue;
-      setOriginalText(transcript);
-      const forcedSrc = lang.startsWith('mr') ? 'mr' : undefined;
-      const method = await translateText(transcript, forcedSrc);
-      if (method && method !== 'fallback') break;
-    }
+    
+    // Use recognition based on language mode (no auto mode)
+    let recognitionLang = languageMode === 'mr' ? 'mr-IN' : 'en-US';
+    
+    // Single recognition for the selected language mode
+    const transcript = await recognizeOnce(recognitionLang);
+    if (!transcript) return;
+    setOriginalText(transcript);
+    await translateText(transcript, languageMode);
+  };
+
+  const cycleLanguageMode = () => {
+    // Toggle between English and Marathi only
+    setLanguageMode(mode => mode === 'en' ? 'mr' : 'en');
+  };
+
+  const getLanguageModeLabel = () => {
+    if (languageMode === 'en') return '🇬🇧 English';
+    return '🇮🇳 मराठी';
   };
 
   const gradientClass = theme === 'dark'
@@ -270,6 +336,29 @@ function App() {
           )}
           <div className={`absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
             theme === 'dark' ? 'bg-yellow-300/20' : 'bg-purple-300/20'
+          }`} />
+        </div>
+      </button>
+
+      {/* Language mode toggle */}
+      <button
+        onClick={cycleLanguageMode}
+        className={`absolute top-6 left-6 z-20 group px-4 py-2 rounded-full transition-all duration-500 transform hover:scale-105 ${
+          theme === 'dark' 
+            ? 'bg-gradient-to-r from-cyan-600 to-blue-600 shadow-lg shadow-cyan-500/30' 
+            : 'bg-gradient-to-r from-pink-400 to-rose-500 shadow-lg shadow-pink-400/40'
+        }`}
+        aria-label="Cycle language mode"
+      >
+        <div className="relative overflow-hidden flex items-center gap-2">
+          <Languages className={`w-5 h-5 transition-transform duration-300 group-hover:rotate-12 ${
+            theme === 'dark' ? 'text-cyan-100' : 'text-white'
+          }`} />
+          <span className={`text-sm font-semibold ${theme === 'dark' ? 'text-cyan-50' : 'text-white'}`}>
+            {getLanguageModeLabel()}
+          </span>
+          <div className={`absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
+            theme === 'dark' ? 'bg-cyan-300/20' : 'bg-pink-300/20'
           }`} />
         </div>
       </button>
@@ -390,10 +479,8 @@ function App() {
           }`}>
             {isListening ? 'Listening...' : isSpeaking ? 'Speaking...' : isLoading ? 'Translating...' : 'Tap the orb to speak'}
           </p>
-          <p className={`text-sm h-6 transition-colors duration-300 ${theme === 'dark' ? 'text-white/60' : 'text-gray-500'}`}>
-            {detectedSource && (
-              <>Detected: {detectedSource.toUpperCase()} ⇒ {(translationMethod && translatedText) ? (detectedSource==='mr' ? 'EN' : 'MR') : ''} ({translationMethod})</>
-            )}
+          <p className={`text-sm mb-4 transition-colors duration-300 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`}>
+            Mode: {getLanguageModeLabel()} → {languageMode === 'en' ? 'Marathi' : 'English'}
           </p>
           
           {/* Translated text display */}

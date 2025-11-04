@@ -6,11 +6,17 @@ Test script for ShabdSetu Translation API
 import asyncio
 import httpx
 import json
+import sys
+
+# Fix encoding for Windows console output
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 async def test_translation_api():
     """Test the translation API with sample text"""
     
-    base_url = "http://localhost:8000"
+    base_url = "http://localhost:8003"
     
     # Test data
     test_cases = [
@@ -22,7 +28,7 @@ async def test_translation_api():
     ]
     
     async with httpx.AsyncClient() as client:
-        print("🚀 Testing ShabdSetu Translation API\n")
+        print("Testing ShabdSetu Translation API\n")
         
         # Test health endpoint
         try:
