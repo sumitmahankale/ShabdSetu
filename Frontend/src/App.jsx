@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Volume2, Languages, Sun, Moon, Heart, MessageSquare, VolumeX, StopCircle } from 'lucide-react';
+import { Mic, MicOff, Volume2, Languages, Sun, Moon, Heart, MessageSquare, VolumeX, StopCircle, MessageCircle, X, Send } from 'lucide-react';
 
 function App() {
   const [isListening, setIsListening] = useState(false);
@@ -26,6 +26,15 @@ function App() {
   const [healthResponse, setHealthResponse] = useState('');
   const [conversationHistory, setConversationHistory] = useState([]);
   const currentUtteranceRef = useRef(null);
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState([
+    {
+      type: 'bot',
+      text: 'Hello! 👋 I\'m ShabdSetu Bot. I can help you learn about this project. Ask me anything!'
+    }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const chatEndRef = useRef(null);
 
   // Romanized Marathi clue words (subset of backend list)
   const romanMrClues = ['namaskar','majha','majhe','maza','nav','sumit','tumhi','kase','kasa','dhanyavad','dhanyawad','dhanyabad','pani','madat','aaj','udya','kal','sakal','ratri'];
@@ -133,6 +142,74 @@ function App() {
   }, [theme]);
 
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
+  
+  // Chatbot knowledge base
+  const getChatbotResponse = (message) => {
+    const msg = message.toLowerCase();
+    
+    if (msg.includes('what') && (msg.includes('shabdsetu') || msg.includes('project'))) {
+      return 'ShabdSetu is a LangChain-powered interactive literacy tutor designed for low-literate populations. It provides bilingual voice translation between English and Marathi, plus AI-powered health information in simple language.';
+    }
+    if (msg.includes('how') && (msg.includes('use') || msg.includes('work'))) {
+      return 'Simply click the microphone orb and speak in English or Marathi. The system will translate your speech to the other language and speak it back. You can also switch to Health Info mode to ask health-related questions!';
+    }
+    if (msg.includes('feature') || msg.includes('what can')) {
+      return '✨ Features:\n• Voice Translation (English ↔ Marathi)\n• Health Information System\n• Voice Recognition & Speech Synthesis\n• Dark/Light Theme\n• AI-powered responses\n• No-scroll split-screen design';
+    }
+    if (msg.includes('health')) {
+      return 'The Health Info mode lets you ask questions about common health issues like fever, cold, cough, headache, diabetes, etc. The system provides symptoms, home remedies, when to see a doctor, and prevention tips in your language!';
+    }
+    if (msg.includes('language') || msg.includes('marathi') || msg.includes('english')) {
+      return 'ShabdSetu supports English and Marathi languages. It can recognize both Devanagari script and romanized Marathi. Just speak naturally, and the system will detect your language automatically!';
+    }
+    if (msg.includes('technology') || msg.includes('tech') || msg.includes('built')) {
+      return '🛠️ Technology Stack:\n• Frontend: React + Vite + Tailwind CSS\n• Backend: FastAPI (Python)\n• AI: LangChain + Google Gemini\n• Speech: Web Speech API\n• Translation: Multi-API system (MyMemory, Google, LibreTranslate)';
+    }
+    if (msg.includes('who') || msg.includes('created') || msg.includes('developer')) {
+      return 'ShabdSetu is developed as an interactive literacy project to help low-literate populations access information in their native language with voice interaction.';
+    }
+    if (msg.includes('version')) {
+      return 'Current version: 4.1.0\nLast updated: November 2024\nStatus: ✅ Fully Operational';
+    }
+    if (msg.includes('help') || msg.includes('command')) {
+      return '💬 You can ask me:\n• What is ShabdSetu?\n• How to use it?\n• What features does it have?\n• Tell me about health mode\n• What technologies are used?\n• And more!';
+    }
+    if (msg.includes('hello') || msg.includes('hi') || msg.includes('hey')) {
+      return 'Hello! 👋 I\'m here to help you learn about ShabdSetu. Ask me anything about the project!';
+    }
+    if (msg.includes('thank') || msg.includes('thanks')) {
+      return 'You\'re welcome! Feel free to ask if you have more questions. 😊';
+    }
+    
+    return 'I\'m not sure about that. Try asking about ShabdSetu\'s features, how to use it, health mode, or the technology behind it!';
+  };
+
+  const handleChatSubmit = (e) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    // Add user message
+    const userMessage = { type: 'user', text: chatInput };
+    setChatMessages(prev => [...prev, userMessage]);
+
+    // Get bot response
+    const botResponse = { type: 'bot', text: getChatbotResponse(chatInput) };
+    
+    // Clear input
+    setChatInput('');
+
+    // Add bot response after a short delay
+    setTimeout(() => {
+      setChatMessages(prev => [...prev, botResponse]);
+    }, 500);
+  };
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages]);
   
   // Initialize speech recognition
   useEffect(() => {
@@ -409,33 +486,44 @@ function App() {
         onClick={cycleLanguageMode}
         className={`absolute top-6 left-6 z-20 group px-4 py-2 rounded-full transition-all duration-500 transform hover:scale-105 ${
           theme === 'dark' 
-            ? 'bg-gradient-to-r from-cyan-600 to-blue-600 shadow-lg shadow-cyan-500/30' 
-            : 'bg-gradient-to-r from-blue-500 to-indigo-600 shadow-lg shadow-blue-400/40'
+            ? 'bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg shadow-blue-500/30' 
+            : 'bg-gradient-to-r from-yellow-400 to-orange-500 shadow-lg shadow-orange-400/40'
         }`}
+        aria-label="Toggle language mode"
       >
-        <span className="text-white font-medium flex items-center gap-2">
-          <Languages className="w-5 h-5" />
-          {getLanguageModeLabel()}
-        </span>
+        <div className="relative overflow-hidden">
+          <span className="text-white font-medium flex items-center gap-2">
+            <Languages className="w-5 h-5" />
+            {getLanguageModeLabel()}
+          </span>
+        </div>
       </button>
 
       {/* Mode toggle (Translation / Health) */}
       <button
         onClick={() => setMode(m => m === 'translate' ? 'health' : 'translate')}
-        className={`absolute top-20 left-6 z-20 group px-4 py-2 rounded-full transition-all duration-500 transform hover:scale-105 ${
-          mode === 'health'
-            ? theme === 'dark'
-              ? 'bg-gradient-to-r from-red-600 to-pink-600 shadow-lg shadow-red-500/30'
-              : 'bg-gradient-to-r from-red-500 to-pink-500 shadow-lg shadow-red-400/40'
-            : theme === 'dark'
-              ? 'bg-gradient-to-r from-green-600 to-teal-600 shadow-lg shadow-green-500/30'
-              : 'bg-gradient-to-r from-green-500 to-teal-500 shadow-lg shadow-green-400/40'
+        className={`absolute top-6 left-40 z-20 group px-4 py-2 rounded-full transition-all duration-500 transform hover:scale-105 ${
+          theme === 'dark'
+            ? 'bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg shadow-blue-500/30'
+            : 'bg-gradient-to-r from-yellow-400 to-orange-500 shadow-lg shadow-orange-400/40'
         }`}
+        aria-label={`Toggle to ${mode === 'health' ? 'translation' : 'health'} mode`}
       >
-        <span className="text-white font-medium flex items-center gap-2">
-          {mode === 'health' ? <Heart className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
-          {mode === 'health' ? 'Health Info' : 'Translation'}
-        </span>
+        <div className="relative overflow-hidden">
+          <span className="text-white font-medium flex items-center gap-2">
+            {mode === 'health' ? (
+              <>
+                <Heart className="w-5 h-5" />
+                Health Info
+              </>
+            ) : (
+              <>
+                <MessageSquare className="w-5 h-5" />
+                Translation
+              </>
+            )}
+          </span>
+        </div>
       </button>
 
       {/* Main content - Split layout when response exists */}
@@ -714,6 +802,111 @@ function App() {
       )}
     </div>
 
+    {/* Chatbot Button - Fixed on left side */}
+    <button
+      onClick={() => setIsChatbotOpen(!isChatbotOpen)}
+      className={`fixed left-6 bottom-6 z-30 group p-4 rounded-full transition-all duration-500 transform hover:scale-110 ${
+        theme === 'dark' 
+          ? 'bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg shadow-blue-500/30' 
+          : 'bg-gradient-to-r from-yellow-400 to-orange-500 shadow-lg shadow-orange-400/40'
+      }`}
+      aria-label="Open chatbot"
+    >
+      {isChatbotOpen ? (
+        <X className="w-6 h-6 text-white" />
+      ) : (
+        <MessageCircle className="w-6 h-6 text-white group-hover:animate-bounce" />
+      )}
+    </button>
+
+    {/* Chatbot Window */}
+    {isChatbotOpen && (
+      <div className={`fixed left-6 bottom-24 z-30 w-96 h-[500px] rounded-2xl shadow-2xl transition-all duration-300 transform animate-slideInUp ${
+        theme === 'dark'
+          ? 'bg-slate-900/95 border-2 border-blue-400/30'
+          : 'bg-white border-2 border-orange-300/50'
+      }`}>
+        {/* Chatbot Header */}
+        <div className={`px-6 py-4 rounded-t-2xl border-b ${
+          theme === 'dark'
+            ? 'bg-gradient-to-r from-blue-600 to-purple-600 border-blue-400/30'
+            : 'bg-gradient-to-r from-yellow-400 to-orange-500 border-orange-300/50'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                <MessageCircle className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-white font-semibold text-lg">ShabdSetu Bot</h3>
+                <p className="text-white/80 text-xs">Ask me anything!</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsChatbotOpen(false)}
+              className="text-white/80 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Chat Messages */}
+        <div className="h-[340px] overflow-y-auto p-4 space-y-3">
+          {chatMessages.map((msg, idx) => (
+            <div
+              key={idx}
+              className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-[80%] px-4 py-2 rounded-2xl ${
+                  msg.type === 'user'
+                    ? theme === 'dark'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-orange-500 text-white'
+                    : theme === 'dark'
+                      ? 'bg-slate-800 text-white'
+                      : 'bg-gray-100 text-gray-900'
+                }`}
+              >
+                <p className="text-sm whitespace-pre-line">{msg.text}</p>
+              </div>
+            </div>
+          ))}
+          <div ref={chatEndRef} />
+        </div>
+
+        {/* Chat Input */}
+        <form onSubmit={handleChatSubmit} className={`p-4 border-t ${
+          theme === 'dark' ? 'border-slate-700' : 'border-gray-200'
+        }`}>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              placeholder="Ask about ShabdSetu..."
+              className={`flex-1 px-4 py-2 rounded-full outline-none transition-all ${
+                theme === 'dark'
+                  ? 'bg-slate-800 text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500'
+                  : 'bg-gray-100 text-gray-900 placeholder-gray-500 focus:ring-2 focus:ring-orange-400'
+              }`}
+            />
+            <button
+              type="submit"
+              className={`p-2 rounded-full transition-all transform hover:scale-110 ${
+                theme === 'dark'
+                  ? 'bg-blue-600 hover:bg-blue-700'
+                  : 'bg-orange-500 hover:bg-orange-600'
+              }`}
+            >
+              <Send className="w-5 h-5 text-white" />
+            </button>
+          </div>
+        </form>
+      </div>
+    )}
+
     {/* Enhanced animations */}
     <style>{`
       @keyframes float {
@@ -733,11 +926,18 @@ function App() {
         from { opacity: 0; transform: translateX(50px); }
         to { opacity: 1; transform: translateX(0); }
       }
+      @keyframes slideInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
       .animate-fadeIn {
         animation: fadeIn 0.5s ease-out;
       }
       .animate-slideInRight {
         animation: slideInRight 0.6s ease-out;
+      }
+      .animate-slideInUp {
+        animation: slideInUp 0.4s ease-out;
       }
     `}</style>
   </div>
