@@ -1,7 +1,7 @@
 # ShabdSetu - शब्दसेतू
-## Real-Time Bidirectional English-Marathi Voice Translation System
+## Real-Time Bidirectional English-Marathi Voice Translation & Health Literacy System
 
-ShabdSetu (meaning "bridge of words" in Marathi) is a professional-grade real-time speech-to-speech translation application that provides seamless bidirectional translation between English and Marathi. Built with modern web technologies, it features intelligent language detection, multi-tier translation fallback, and an intuitive one-touch interface.
+ShabdSetu (meaning "bridge of words" in Marathi) is a professional-grade real-time speech-to-speech translation application that provides seamless bidirectional translation between English and Marathi, along with an integrated health literacy module for providing accessible health information to low-literate populations. Built with modern web technologies, it features intelligent language detection, multi-tier translation fallback, health query processing, and an intuitive one-touch interface.
 
 ![ShabdSetu Interface](https://github.com/user-attachments/assets/7f33a11a-4e1c-41c1-a3c3-9b32e5bac439)
 
@@ -14,6 +14,15 @@ ShabdSetu (meaning "bridge of words" in Marathi) is a professional-grade real-ti
 - Real-Time Processing - Sub-3-second end-to-end translation with response caching
 - Speech-to-Speech - Complete voice input to voice output workflow with natural synthesis
 
+### Health Literacy Module
+- Health Query Processing - Provides accessible health information in both English and Marathi
+- Knowledge Base - Comprehensive information on 8+ common health conditions
+- Simple Language - Health information presented in easy-to-understand terms
+- Bilingual Support - Health responses available in both English and Marathi
+- Professional Formatting - Section headers, symptoms, causes, remedies clearly organized
+- Voice Output - Health information read aloud for improved accessibility
+- AI Integration - Optional Google Gemini AI for advanced health queries
+
 ### Advanced Translation Engine
 - Multi-Tier Translation System with 5 free APIs and intelligent fallback
 - Dictionary-First Approach covering 100+ common phrases for instant accuracy
@@ -23,8 +32,13 @@ ShabdSetu (meaning "bridge of words" in Marathi) is a professional-grade real-ti
 
 ### Modern User Interface
 - Professional Design with glassmorphic effects and animated water orb visualization
+- Dual Mode Support - Switch between Translation Mode and Health Mode seamlessly
 - One-Touch Operation - Single button controls speech recording and translation
 - Visual Feedback System for recording, processing, and playback states
+- Stop Voice Control - Ability to stop voice playback at any time
+- Dark and Light Themes - Professional theme toggle with color consistency
+- Split-Screen Layout - No-scroll design with orb on left, response on right
+- Interactive Chatbot - Project information assistant with natural conversation
 - Conversation History Panel with copy-to-clipboard functionality
 - Detailed Debug Information for troubleshooting and transparency
 - Fully Responsive Design optimized for desktop, tablet, and mobile
@@ -42,6 +56,8 @@ ShabdSetu (meaning "bridge of words" in Marathi) is a professional-grade real-ti
 - FastAPI - High-performance async web framework with automatic API documentation
 - Multiple Translation APIs - MyMemory, Google Translate, Lingva, LibreTranslate, Deep Translator
 - Advanced Language Detection - Devanagari Unicode detection and statistical analysis
+- Health Literacy Module - Knowledge base with fallback AI support via Google Gemini
+- LangChain Integration - Optional AI-powered health responses with conversation memory
 - Comprehensive Error Handling - Graceful fallbacks with detailed error logging
 - CORS-Enabled - Configured for seamless frontend-backend communication
 - In-Memory Caching - LRU cache for frequently requested translations
@@ -54,7 +70,8 @@ ShabdSetu (meaning "bridge of words" in Marathi) is a professional-grade real-ti
 - Web Speech API - Native browser speech recognition for voice input
 - Speech Synthesis API - Text-to-speech with multi-voice fallback system
 - Axios - Promise-based HTTP client for API communication
-- Lucide React - Modern icon library for UI elements
+- Lucide React - Modern icon library for comprehensive UI elements
+- Custom Animations - Smooth transitions and floating effects
 
 ## Translation Services
 
@@ -109,12 +126,36 @@ npm run dev
 Frontend runs at: `http://localhost:5173` or `http://localhost:3000`
 
 ### 3. Using the Application
+
+#### Translation Mode
 1. Navigate to `http://localhost:5173` in your browser
 2. Grant microphone permissions when prompted
-3. Select your preferred language mode (English or Marathi)
-4. Click the microphone button to start recording
-5. Speak clearly in your chosen language
-6. Listen to the automatic translation output
+3. Select Translation mode using the mode toggle button
+4. Select your preferred language mode (English or Marathi)
+5. Click the microphone button to start recording
+6. Speak clearly in your chosen language
+7. Listen to the automatic translation output
+8. Use the Stop Voice button to interrupt playback
+9. Click New Query to start a fresh translation
+
+#### Health Mode
+1. Click the Health mode button to switch modes
+2. Select your preferred language (English or Marathi)
+3. Click the microphone button and describe your health concern
+4. Receive easy-to-understand health information with:
+   - Symptoms description
+   - Common causes
+   - Home remedies
+   - Medicines information
+   - Important warnings
+5. Information is automatically read aloud
+6. Professional formatting with bold section headers
+
+#### Project Chatbot
+1. Click the chatbot button in the bottom-left corner
+2. Ask questions about the project features, usage, or technology
+3. Get instant responses about ShabdSetu functionality
+4. Close the chatbot by clicking the X button
 
 ### Alternative: Production Build
 ```bash
@@ -204,6 +245,27 @@ Response (200 OK):
 }
 ```
 
+### Health Query Endpoint
+**POST** `/health/query`
+
+Request Body:
+```json
+{
+  "query": "I have fever and headache",
+  "language": "en"
+}
+```
+
+Response (200 OK):
+```json
+{
+  "query": "I have fever and headache",
+  "response": "Health Information\n\nSymptoms: High body temperature...",
+  "language": "en",
+  "timestamp": "2025-11-06T10:30:00"
+}
+```
+
 ### Health Check Endpoint
 **GET** `/health`
 
@@ -230,7 +292,8 @@ Response:
     "Marathi to English", 
     "Auto-detection", 
     "Real-time",
-    "Multi-tier fallback"
+    "Multi-tier fallback",
+    "Health Literacy"
   ],
   "translation_apis": [
     "Dictionary", 
@@ -270,6 +333,20 @@ curl -X POST "http://localhost:8003/translate" \
 Check API Health:
 ```bash
 curl http://localhost:8003/health
+```
+
+Test Health Query (English):
+```bash
+curl -X POST "http://localhost:8003/health/query" \
+     -H "Content-Type: application/json" \
+     -d '{"query": "I have fever", "language": "en"}'
+```
+
+Test Health Query (Marathi):
+```bash
+curl -X POST "http://localhost:8003/health/query" \
+     -H "Content-Type: application/json" \
+     -d '{"query": "मला ताप आहे", "language": "mr"}'
 ```
 
 ### Python Testing Script
@@ -313,15 +390,17 @@ speechSynthesis.speak(utterance);
 ```
 ShabdSetu/
 ├── Backend/                    # FastAPI translation server
-│   ├── main.py                # Main application with 5 translation APIs
+│   ├── main.py                # Main application with translation APIs
+│   ├── health_literacy.py     # Health literacy module with knowledge base
+│   ├── shabdsetu.py          # Core translation service
 │   ├── requirements.txt       # Python dependencies
 │   ├── .env.example          # Environment template
 │   └── README.md             # Detailed backend documentation
 ├── Frontend/                   # React speech interface
 │   ├── src/
-│   │   ├── App.jsx           # Main application with speech features
+│   │   ├── App.jsx           # Main application with speech and health features
 │   │   ├── main.jsx          # Entry point
-│   │   └── index.css         # Tailwind CSS styling
+│   │   └── index.css         # Tailwind CSS styling with animations
 │   ├── package.json          # Node.js dependencies
 │   └── vite.config.js        # Vite configuration
 ├── test_marathi.html          # Voice synthesis testing tool
@@ -351,7 +430,40 @@ ShabdSetu/
 - Firefox: May require additional voice installation on Linux
 - Mobile browsers: Ensure microphone permissions in app settings
 
-## Advanced Features
+### Advanced Features
+
+### Health Knowledge Base
+The health literacy module includes comprehensive information on:
+
+1. Common Health Conditions (8+ conditions covered):
+   - Fever and temperature management
+   - Headache types and causes
+   - Cold and flu symptoms
+   - Stomach pain and digestive issues
+   - Cough and respiratory problems
+   - Body pain and muscle aches
+   - Dizziness and balance issues
+   - General weakness and fatigue
+
+2. Information Categories for Each Condition:
+   - Detailed symptom descriptions
+   - Common underlying causes
+   - Safe home remedies
+   - Over-the-counter medicine options
+   - Warning signs requiring medical attention
+   - Prevention and self-care tips
+
+3. Bilingual Support:
+   - Complete information in English
+   - Complete information in Marathi
+   - Culturally appropriate health advice
+   - Simple language for low-literacy users
+
+4. AI Enhancement:
+   - Optional Google Gemini integration
+   - Context-aware health responses
+   - Natural conversation capability
+   - Fallback to knowledge base when AI unavailable
 
 ### Language Detection Algorithm
 The system employs a multi-stage detection process:
@@ -415,6 +527,20 @@ Optimizations for sub-3-second response times:
 - Solution 3: Wait for voices to load (check browser console for "Voices loaded")
 - Solution 4: Install language pack: Windows Settings > Time & Language > Language
 - Solution 5: Try different browser (Chrome/Edge have better Marathi support)
+- Solution 6: Use Stop Voice button if audio is stuck or repeating
+
+**Issue: Health mode not providing responses**
+- Solution 1: Verify backend server is running and health_literacy.py is loaded
+- Solution 2: Try simpler health queries like "I have fever" or "headache"
+- Solution 3: Check backend logs for health module errors
+- Solution 4: Ensure Google API key is configured in .env file (optional)
+- Solution 5: Test with curl command to verify health endpoint
+
+**Issue: Chatbot not responding**
+- Solution 1: Click the chatbot button to ensure it is open
+- Solution 2: Type clear questions about project features or usage
+- Solution 3: Check browser console for JavaScript errors
+- Solution 4: Refresh the page to reset chatbot state
 
 **Issue: API connection errors or timeouts**
 - Solution 1: Verify backend server is running on port 8003
@@ -564,23 +690,27 @@ We welcome contributions from the community. Here's how to get involved:
 
 ## Future Roadmap
 
-### Phase 1: Enhanced Translation (Q1 2026)
+### Phase 1: Enhanced Features (Q1 2026)
 - Offline Translation - Local TensorFlow.js model for internet-free usage
 - Context-Aware Translation - Understanding sentence context and idioms
 - Improved Dictionary - Expand to 500+ common phrases and expressions
 - Translation Confidence Scores - User feedback and quality metrics
+- Expanded Health Database - 20+ health conditions with detailed information
+- Personalized Health Tracking - Optional health query history and insights
 
 ### Phase 2: Language Expansion (Q2 2026)
 - Hindi Language Support - Third language with bidirectional translation
 - Tamil and Telugu - Additional Indian language support
 - Multi-Language Detection - Automatic detection across 5+ languages
 - Regional Dialect Support - Mumbai Marathi vs Pune Marathi variations
+- Health Information in Multiple Languages - Expand health literacy to Hindi and Tamil
 
 ### Phase 3: Mobile Applications (Q3 2026)
 - Native iOS App - App Store release with offline capabilities
 - Native Android App - Google Play release with enhanced voice quality
 - Progressive Web App - Offline functionality and app-like experience
 - Mobile Optimization - Touch gestures and mobile-first UI
+- Camera OCR - Translate text from images and documents
 
 ### Phase 4: Advanced Features (Q4 2026)
 - Voice Training - Custom pronunciation and accent adaptation
@@ -588,6 +718,9 @@ We welcome contributions from the community. Here's how to get involved:
 - Translation History - Optional cloud sync (privacy-preserving)
 - Custom Dictionary - User-added words and phrases
 - Export Functionality - Save conversations as text or audio
+- Health AI Assistant - Advanced medical query understanding with citations
+- Medication Reminders - Optional health management features
+- Symptom Checker - Interactive health assessment tool
 
 ### Technical Improvements (Ongoing)
 - WebAssembly Integration - 50% faster local processing
@@ -596,6 +729,8 @@ We welcome contributions from the community. Here's how to get involved:
 - Neural Voice Synthesis - Server-side high-quality TTS
 - Speech Recognition Accuracy - Custom acoustic models for Marathi
 - API Rate Optimization - Smart request batching and debouncing
+- Health Data Privacy - HIPAA-compliant data handling (optional)
+- Machine Learning Models - Local health query classification
 
 ### Community Features
 - User Feedback System - Report translation errors and suggest improvements
@@ -665,8 +800,8 @@ For enterprise deployments or custom development:
 
 ---
 
-**Built with dedication for the Marathi-speaking community**
+**Built with dedication for the Marathi-speaking community and health literacy**
 
-ShabdSetu - Building intelligent bridges between languages
+ShabdSetu - Building intelligent bridges between languages and health information
 
-Version 3.0.0 | Last Updated: November 4, 2025
+Version 3.1.0 | Last Updated: November 6, 2025
