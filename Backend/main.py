@@ -9,6 +9,7 @@ import time
 import urllib.parse
 import os
 from functools import lru_cache
+from health_literacy import get_health_tutor, HealthLiteracyTutor
 
 try:
     from langdetect import detect
@@ -31,15 +32,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="ShabdSetu - Bidirectional English-Marathi Translator",
-    description="A fast, reliable translation service for English-Marathi bidirectional translation",
-    version="3.0.0"
+    title="ShabdSetu - Lang-chain Powered Interactive Literacy Tutor",
+    description="Bidirectional translation and health information system for low-literate populations",
+    version="4.0.0"
 )
 
 # Add CORS middleware for frontend communication
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3003", "http://localhost:3002", "http://localhost:3000", "http://localhost:3001"],
+    allow_origins=["http://localhost:3003", "http://localhost:3002", "http://localhost:3000", "http://localhost:3001", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*", "Content-Type"],
@@ -49,6 +50,10 @@ class TranslationRequest(BaseModel):
     text: str
     source_language: str = "auto"  # auto-detect by default
     target_language: str = "auto"  # auto-determine target
+
+class HealthQueryRequest(BaseModel):
+    query: str
+    language: str = "en"  # 'en' or 'mr'
 
 class TranslationResponse(BaseModel):
     original_text: str
@@ -599,14 +604,26 @@ class BilingualTranslationService:
 # Initialize the translation service
 translation_service = BilingualTranslationService()
 
+# Initialize the health literacy tutor
+health_tutor = get_health_tutor()
+
 @app.get("/")
 async def root():
     """Health check endpoint"""
     return {
-        "message": "ShabdSetu Bidirectional Translation API is running!",
-        "version": "3.0.0",
-        "features": ["English to Marathi", "Marathi to English", "Auto-detection", "Real-time"],
+        "message": "ShabdSetu - Lang-chain Powered Interactive Literacy Tutor is running!",
+        "version": "4.0.0",
+        "features": [
+            "English to Marathi Translation", 
+            "Marathi to English Translation", 
+            "Health Information in English",
+            "Health Information in Marathi",
+            "AI-Powered Health Literacy",
+            "Auto-detection", 
+            "Real-time"
+        ],
         "translation_apis": ["Dictionary", "MyMemory", "Google Translate (Free)", "Lingva Translate", "LibreTranslate"],
+        "health_ai": "Google Gemini Pro with LangChain",
         "api_calls_made": translation_service.api_call_count
     }
 
@@ -694,6 +711,100 @@ async def test_encoding(request: TranslationRequest):
         "char_codes": [ord(c) for c in request.text[:10]],  # First 10 chars
         "is_devanagari": bool(re.search(r'[\u0900-\u097F]', request.text))
     }
+
+@app.post("/health/query")
+async def health_query(request: HealthQueryRequest):
+    """
+    Health information endpoint - provides health information in English or Marathi
+    Detects health-related queries and provides appropriate information
+    """
+    try:
+        if not request.query.strip():
+            raise HTTPException(status_code=400, detail="Query cannot be empty")
+        
+        # Check if it's a health query
+        is_health_query = health_tutor.detect_health_query(request.query)
+        
+        if not is_health_query:
+            return {
+                "is_health_query": False,
+                "message": "This doesn't appear to be a health-related query. Please ask about health symptoms, conditions, or medical concerns.",
+                "suggestion": "Try asking about: fever, cold, cough, headache, stomach pain, or other health issues."
+            }
+        
+        # Process the health query
+        result = health_tutor.process_health_query(request.query, request.language)
+        
+        return {
+            "is_health_query": True,
+            "query": request.query,
+            "language": request.language,
+            "response": result['response'],
+            "source": result['source'],
+            "disclaimer": "This information is for educational purposes only. Please consult a qualified healthcare professional for medical advice."
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Health query error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to process health query")
+
+@app.post("/smart/query")
+async def smart_query(request: TranslationRequest):
+    """
+    Smart endpoint that detects if query is health-related or translation request
+    Routes to appropriate service and returns response in user's language
+    """
+    try:
+        if not request.text.strip():
+            raise HTTPException(status_code=400, detail="Query cannot be empty")
+        
+        # Detect language
+        has_devanagari = bool(re.search(r'[\u0900-\u097F]', request.text))
+        detected_lang = 'mr' if has_devanagari else 'en'
+        
+        # Check if it's a health query
+        is_health_query = health_tutor.detect_health_query(request.text)
+        
+        if is_health_query:
+            # Process as health query
+            health_result = health_tutor.process_health_query(request.text, detected_lang)
+            
+            return {
+                "type": "health",
+                "original_query": request.text,
+                "detected_language": detected_lang,
+                "response": health_result['response'],
+                "source": health_result['source'],
+                "is_health_query": True
+            }
+        else:
+            # Process as translation request
+            source_language = "Marathi" if detected_lang == 'mr' else "English"
+            target_language = "English" if detected_lang == 'mr' else "Marathi"
+            
+            translation_result = await translation_service.translate(
+                text=request.text,
+                source_lang=detected_lang,
+                target_lang='en' if detected_lang == 'mr' else 'mr'
+            )
+            
+            return {
+                "type": "translation",
+                "original_text": request.text,
+                "translated_text": translation_result['translated_text'],
+                "source_language": translation_result['source_language'],
+                "target_language": translation_result['target_language'],
+                "translation_method": translation_result['method'],
+                "is_health_query": False
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Smart query error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to process query")
 
 if __name__ == "__main__":
     import uvicorn

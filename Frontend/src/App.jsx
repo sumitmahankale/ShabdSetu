@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Volume2, Languages, Sun, Moon } from 'lucide-react';
+import { Mic, MicOff, Volume2, Languages, Sun, Moon, Heart, MessageSquare, VolumeX, StopCircle } from 'lucide-react';
 
 function App() {
   const [isListening, setIsListening] = useState(false);
@@ -22,6 +22,10 @@ function App() {
   });
   const [attempts, setAttempts] = useState([]);
   const [languageMode, setLanguageMode] = useState('en'); // 'en' or 'mr' (removed 'auto')
+  const [mode, setMode] = useState('translate'); // 'translate' or 'health'
+  const [healthResponse, setHealthResponse] = useState('');
+  const [conversationHistory, setConversationHistory] = useState([]);
+  const currentUtteranceRef = useRef(null);
 
   // Romanized Marathi clue words (subset of backend list)
   const romanMrClues = ['namaskar','majha','majhe','maza','nav','sumit','tumhi','kase','kasa','dhanyavad','dhanyawad','dhanyabad','pani','madat','aaj','udya','kal','sakal','ratri'];
@@ -74,6 +78,48 @@ function App() {
       console.error('Translation error', e);
       setTranslatedText('Translation failed.');
       return '';
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleHealthQuery = async (text) => {
+    setIsLoading(true);
+    try {
+      const hasDevanagari = /[\u0900-\u097F]/.test(text);
+      const detectedLang = hasDevanagari ? 'mr' : 'en';
+      
+      const response = await fetch(`http://localhost:8003/health/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: text, language: detectedLang })
+      });
+      
+      const data = await response.json();
+      
+      if (data.is_health_query) {
+        setHealthResponse(data.response);
+        setTranslatedText(data.response);
+        
+        // Add to conversation history
+        setConversationHistory(prev => [...prev, {
+          query: text,
+          response: data.response,
+          language: detectedLang,
+          timestamp: new Date().toLocaleTimeString()
+        }]);
+        
+        // Speak the response
+        speakText(data.response, detectedLang);
+      } else {
+        setHealthResponse(data.message || 'Not a health query');
+        setTranslatedText(data.message || 'Not a health query');
+      }
+      
+    } catch (e) {
+      console.error('Health query error', e);
+      setHealthResponse('Failed to get health information.');
+      setTranslatedText('Failed to get health information.');
     } finally {
       setIsLoading(false);
     }
@@ -137,6 +183,14 @@ function App() {
 
   // (Removed old translateText implementation)
 
+  const stopSpeaking = () => {
+    speechSynthesis.cancel();
+    setIsSpeaking(false);
+    if (currentUtteranceRef.current) {
+      currentUtteranceRef.current = null;
+    }
+  };
+
   // Text to speech with voice availability check
   const speakText = (text, targetLang = 'mr') => {
     if (!('speechSynthesis' in window) || !text) {
@@ -150,6 +204,7 @@ function App() {
     // Wait for voices to be loaded
     const speak = () => {
       const utterance = new SpeechSynthesisUtterance(text);
+      currentUtteranceRef.current = utterance;
       
       if (targetLang === 'mr') {
         utterance.lang = 'mr-IN';
@@ -199,12 +254,14 @@ function App() {
       
       utterance.onend = () => {
         setIsSpeaking(false);
+        currentUtteranceRef.current = null;
         console.log('Speech synthesis completed');
       };
       
       utterance.onerror = (event) => {
         console.error('Speech synthesis error:', event);
         setIsSpeaking(false);
+        currentUtteranceRef.current = null;
       };
       
       console.log(`Speaking: "${text}" in language: ${utterance.lang}`);
@@ -240,6 +297,7 @@ function App() {
     if (!recognitionRef.current || isListening) return;
     attemptingLangsRef.current = [...languageAttempts];
     setTranslatedText('');
+    setHealthResponse('');
     setDetectedSource('');
     setTranslationMethod('');
     setOriginalText('');
@@ -251,7 +309,13 @@ function App() {
     const transcript = await recognizeOnce(recognitionLang);
     if (!transcript) return;
     setOriginalText(transcript);
-    await translateText(transcript, languageMode);
+    
+    // Route to appropriate handler based on mode
+    if (mode === 'health') {
+      await handleHealthQuery(transcript);
+    } else {
+      await translateText(transcript, languageMode);
+    }
   };
 
   const cycleLanguageMode = () => {
@@ -346,21 +410,32 @@ function App() {
         className={`absolute top-6 left-6 z-20 group px-4 py-2 rounded-full transition-all duration-500 transform hover:scale-105 ${
           theme === 'dark' 
             ? 'bg-gradient-to-r from-cyan-600 to-blue-600 shadow-lg shadow-cyan-500/30' 
-            : 'bg-gradient-to-r from-pink-400 to-rose-500 shadow-lg shadow-pink-400/40'
+            : 'bg-gradient-to-r from-blue-500 to-indigo-600 shadow-lg shadow-blue-400/40'
         }`}
-        aria-label="Cycle language mode"
       >
-        <div className="relative overflow-hidden flex items-center gap-2">
-          <Languages className={`w-5 h-5 transition-transform duration-300 group-hover:rotate-12 ${
-            theme === 'dark' ? 'text-cyan-100' : 'text-white'
-          }`} />
-          <span className={`text-sm font-semibold ${theme === 'dark' ? 'text-cyan-50' : 'text-white'}`}>
-            {getLanguageModeLabel()}
-          </span>
-          <div className={`absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
-            theme === 'dark' ? 'bg-cyan-300/20' : 'bg-pink-300/20'
-          }`} />
-        </div>
+        <span className="text-white font-medium flex items-center gap-2">
+          <Languages className="w-5 h-5" />
+          {getLanguageModeLabel()}
+        </span>
+      </button>
+
+      {/* Mode toggle (Translation / Health) */}
+      <button
+        onClick={() => setMode(m => m === 'translate' ? 'health' : 'translate')}
+        className={`absolute top-20 left-6 z-20 group px-4 py-2 rounded-full transition-all duration-500 transform hover:scale-105 ${
+          mode === 'health'
+            ? theme === 'dark'
+              ? 'bg-gradient-to-r from-red-600 to-pink-600 shadow-lg shadow-red-500/30'
+              : 'bg-gradient-to-r from-red-500 to-pink-500 shadow-lg shadow-red-400/40'
+            : theme === 'dark'
+              ? 'bg-gradient-to-r from-green-600 to-teal-600 shadow-lg shadow-green-500/30'
+              : 'bg-gradient-to-r from-green-500 to-teal-500 shadow-lg shadow-green-400/40'
+        }`}
+      >
+        <span className="text-white font-medium flex items-center gap-2">
+          {mode === 'health' ? <Heart className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
+          {mode === 'health' ? 'Health Info' : 'Translation'}
+        </span>
       </button>
 
       {/* Main water orb */}
@@ -483,26 +558,114 @@ function App() {
             Mode: {getLanguageModeLabel()} → {languageMode === 'en' ? 'Marathi' : 'English'}
           </p>
           
-          {/* Translated text display */}
+          {/* Translated text display - Professional and Attractive */}
           {translatedText && (
-            <div className={`backdrop-blur-lg rounded-2xl p-6 mt-6 max-w-md mx-auto border transition-all duration-500 transform animate-fadeIn ${
+            <div className={`backdrop-blur-xl rounded-3xl p-8 mt-8 max-w-2xl mx-auto border-2 transition-all duration-500 transform animate-fadeIn shadow-2xl ${
               theme === 'dark'
-                ? 'bg-white/10 border-white/20 shadow-lg shadow-blue-500/10'
-                : 'bg-white/80 border-orange-200/50 shadow-lg shadow-orange-300/20'
+                ? 'bg-gradient-to-br from-slate-900/95 via-blue-900/90 to-slate-900/95 border-blue-400/30'
+                : 'bg-gradient-to-br from-white via-blue-50 to-white border-blue-300/40'
             }`}>
-              {originalText && (
-                <p className={`text-sm mb-2 italic ${theme === 'dark' ? 'text-white/60' : 'text-gray-600'}`}>You said: {originalText}</p>
-              )}
-              <p className={`text-xl font-medium leading-relaxed transition-colors duration-300 ${
-                theme === 'dark' ? 'text-white' : 'text-gray-800'
-              }`}>
-                {translatedText}
-              </p>
-                {attempts.length > 0 && (
-                  <div className="mt-4 text-xs font-mono max-h-32 overflow-auto opacity-70 text-left whitespace-pre-wrap break-all">
-                    {attempts.map((a,i)=>(<div key={i}>{a}</div>))}
+              {/* Header with icon */}
+              <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/10">
+                {mode === 'health' ? (
+                  <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-red-500/20' : 'bg-red-100'}`}>
+                    <Heart className={`w-5 h-5 ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`} />
+                  </div>
+                ) : (
+                  <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-blue-500/20' : 'bg-blue-100'}`}>
+                    <Languages className={`w-5 h-5 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
                   </div>
                 )}
+                <h3 className={`text-lg font-semibold ${
+                  theme === 'dark' ? 'text-blue-300' : 'text-blue-700'
+                }`}>
+                  {mode === 'health' ? 'Health Information' : 'Translation Result'}
+                </h3>
+              </div>
+
+              {/* Original text - if available */}
+              {originalText && (
+                <div className={`mb-4 p-4 rounded-xl ${
+                  theme === 'dark' ? 'bg-white/5' : 'bg-gray-100/80'
+                }`}>
+                  <p className={`text-xs uppercase tracking-wider mb-2 font-semibold ${
+                    theme === 'dark' ? 'text-blue-400/80' : 'text-blue-600/80'
+                  }`}>
+                    Your Query
+                  </p>
+                  <p className={`text-base italic leading-relaxed ${
+                    theme === 'dark' ? 'text-white/80' : 'text-gray-700'
+                  }`}>
+                    "{originalText}"
+                  </p>
+                </div>
+              )}
+
+              {/* Main translated/response text */}
+              <div className={`p-5 rounded-xl ${
+                theme === 'dark' 
+                  ? 'bg-gradient-to-br from-blue-500/10 to-purple-500/10' 
+                  : 'bg-gradient-to-br from-blue-50 to-purple-50'
+              }`}>
+                <p className={`text-lg font-medium leading-relaxed whitespace-pre-line ${
+                  theme === 'dark' ? 'text-white' : 'text-gray-900'
+                }`} style={{ fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" }}>
+                  {translatedText}
+                </p>
+              </div>
+
+              {/* Translation method badge */}
+              {translationMethod && mode === 'translate' && (
+                <div className="mt-4 flex items-center gap-2">
+                  <span className={`text-xs px-3 py-1 rounded-full ${
+                    theme === 'dark' 
+                      ? 'bg-green-500/20 text-green-300' 
+                      : 'bg-green-100 text-green-700'
+                  }`}>
+                    Via: {translationMethod}
+                  </span>
+                  {detectedSource && (
+                    <span className={`text-xs px-3 py-1 rounded-full ${
+                      theme === 'dark' 
+                        ? 'bg-blue-500/20 text-blue-300' 
+                        : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      Detected: {detectedSource}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Stop button when speaking */}
+              {isSpeaking && (
+                <button
+                  onClick={stopSpeaking}
+                  className={`mt-4 w-full py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 ${
+                    theme === 'dark'
+                      ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30'
+                      : 'bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-400/40'
+                  }`}
+                >
+                  <StopCircle className="w-5 h-5" />
+                  Stop Voice
+                </button>
+              )}
+
+              {/* Debug info - collapsible */}
+              {attempts.length > 0 && (
+                <details className="mt-4">
+                  <summary className={`text-xs cursor-pointer ${
+                    theme === 'dark' ? 'text-white/50 hover:text-white/70' : 'text-gray-500 hover:text-gray-700'
+                  }`}>
+                    Debug Info
+                  </summary>
+                  <div className={`mt-2 text-xs font-mono max-h-32 overflow-auto p-3 rounded-lg ${
+                    theme === 'dark' ? 'bg-black/30 text-green-400' : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    {attempts.map((a,i)=>(<div key={i} className="mb-1">{a}</div>))}
+                  </div>
+                </details>
+              )}
             </div>
           )}
         </div>

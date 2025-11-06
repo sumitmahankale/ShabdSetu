@@ -6,3 +6,9 @@ requests
 langdetect
 httpx>=0.27.0
 idna>=3.4
+langchain
+langchain-community
+langchain-google-genai
+google-generativeai
+faiss-cpu
+tiktoken
