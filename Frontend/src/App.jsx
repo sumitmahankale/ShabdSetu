@@ -344,7 +344,7 @@ function App() {
   const hoverShadow = theme === 'dark' ? 'hover:shadow-blue-400/70' : 'hover:shadow-orange-500/70';
 
   return (
-    <div className={`min-h-screen ${gradientClass} flex items-center justify-center relative overflow-hidden transition-all duration-700 ease-in-out`}>
+    <div className={`h-screen ${gradientClass} flex items-center justify-center relative overflow-hidden transition-all duration-700 ease-in-out`}>
       {/* Animated background particles */}
       <div className="absolute inset-0 overflow-hidden">
         {[...Array(12)].map((_, i) => (
@@ -438,41 +438,47 @@ function App() {
         </span>
       </button>
 
-      {/* Main water orb */}
-      <div className="relative z-10 flex flex-col items-center">
-        {/* Water orb container */}
-        <div 
-          className={`relative transition-transform duration-300 ease-out ${
-            isListening ? 'animate-pulse' : ''
-          }`}
-          style={{ transform: `scale(${waterScale})` }}
-        >
-          {/* Ripple effects */}
-          {ripples.map((id) => (
-            <div
-              key={id}
-              className={`absolute inset-0 border-2 rounded-full animate-ping transition-colors duration-300 ${
-                theme === 'dark' ? 'border-white/30' : 'border-orange-400/40'
-              }`}
-              style={{
-                width: '300px',
-                height: '300px',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)'
-              }}
-            />
-          ))}
-          
-          {/* Main water orb */}
-          <div
-            className={`w-80 h-80 rounded-full bg-gradient-to-br ${orbGradient} 
-              shadow-2xl ${shadowColor} relative overflow-hidden cursor-pointer
-              transition-all duration-500 ${hoverShadow} hover:scale-105 group
-              ${isLoading ? 'animate-spin' : ''}
-              ${isSpeaking ? 'animate-bounce' : ''}`}
-            onClick={startListening}
+      {/* Main content - Split layout when response exists */}
+      <div className={`relative z-10 w-full h-full flex items-center transition-all duration-700 ${
+        translatedText ? 'justify-start gap-8 px-8' : 'justify-center'
+      }`}>
+        
+        {/* Left side: Water orb (shrinks when response shown) */}
+        <div className={`transition-all duration-700 ${
+          translatedText ? 'flex-shrink-0' : 'flex flex-col items-center'
+        }`}>
+          <div 
+            className={`relative transition-all duration-700 ease-out ${
+              isListening ? 'animate-pulse' : ''
+            }`}
+            style={{ transform: `scale(${translatedText ? 0.45 : waterScale})` }}
           >
+            {/* Ripple effects */}
+            {ripples.map((id) => (
+              <div
+                key={id}
+                className={`absolute inset-0 border-2 rounded-full animate-ping transition-colors duration-300 ${
+                  theme === 'dark' ? 'border-white/30' : 'border-orange-400/40'
+                }`}
+                style={{
+                  width: '300px',
+                  height: '300px',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)'
+                }}
+              />
+            ))}
+            
+            {/* Main water orb */}
+            <div
+              className={`w-80 h-80 rounded-full bg-gradient-to-br ${orbGradient} 
+                shadow-2xl ${shadowColor} relative overflow-hidden cursor-pointer
+                transition-all duration-500 ${hoverShadow} hover:scale-105 group
+                ${isLoading ? 'animate-spin' : ''}
+                ${isSpeaking ? 'animate-bounce' : ''}`}
+              onClick={startListening}
+            >
             {/* Dynamic glow effect */}
             <div className={`absolute inset-0 rounded-full transition-opacity duration-300 ${
               theme === 'dark' 
@@ -540,33 +546,39 @@ function App() {
           </div>
         </div>
 
-        {/* Status text */}
-        <div className="mt-8 text-center">
-          <h1 className={`text-4xl font-bold mb-4 bg-gradient-to-r bg-clip-text text-transparent transition-all duration-500 ${
-            theme === 'dark' 
-              ? 'from-cyan-300 to-blue-300' 
-              : 'from-orange-500 to-pink-500'
-          }`}>
-            ShabdSetu
-          </h1>
-          <p className={`text-lg mb-2 transition-colors duration-300 ${
-            theme === 'dark' ? 'text-white/80' : 'text-gray-700'
-          }`}>
-            {isListening ? 'Listening...' : isSpeaking ? 'Speaking...' : isLoading ? 'Translating...' : 'Tap the orb to speak'}
-          </p>
-          <p className={`text-sm mb-4 transition-colors duration-300 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`}>
-            Mode: {getLanguageModeLabel()} → {languageMode === 'en' ? 'Marathi' : 'English'}
-          </p>
-          
-          {/* Translated text display - Professional and Attractive */}
-          {translatedText && (
-            <div className={`backdrop-blur-xl rounded-3xl p-8 mt-8 max-w-2xl mx-auto border-2 transition-all duration-500 transform animate-fadeIn shadow-2xl ${
-              theme === 'dark'
-                ? 'bg-gradient-to-br from-slate-900/95 via-blue-900/90 to-slate-900/95 border-blue-400/30'
-                : 'bg-gradient-to-br from-white via-blue-50 to-white border-blue-300/40'
+        {/* Status text - only show when no response */}
+        {!translatedText && (
+          <div className="mt-8 text-center">
+            <h1 className={`text-4xl font-bold mb-4 bg-gradient-to-r bg-clip-text text-transparent transition-all duration-500 ${
+              theme === 'dark' 
+                ? 'from-cyan-300 to-blue-300' 
+                : 'from-orange-500 to-pink-500'
             }`}>
-              {/* Header with icon */}
-              <div className="flex items-center gap-3 mb-4 pb-3 border-b border-white/10">
+              ShabdSetu
+            </h1>
+            <p className={`text-lg mb-2 transition-colors duration-300 ${
+              theme === 'dark' ? 'text-white/80' : 'text-gray-700'
+            }`}>
+              {isListening ? 'Listening...' : isSpeaking ? 'Speaking...' : isLoading ? 'Processing...' : 'Tap the orb to speak'}
+            </p>
+            <p className={`text-sm mb-4 transition-colors duration-300 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`}>
+              Mode: {getLanguageModeLabel()} → {languageMode === 'en' ? 'Marathi' : 'English'}
+            </p>
+          </div>
+        )}
+      </div>
+          
+      {/* Right side: Response card - only show when response exists */}
+      {translatedText && (
+        <div className="flex-1 h-full flex items-center py-8 pr-8 overflow-hidden">
+          <div className={`w-full h-full max-h-[85vh] overflow-y-auto backdrop-blur-xl rounded-3xl p-8 border-2 transition-all duration-500 transform animate-slideInRight shadow-2xl ${
+            theme === 'dark'
+              ? 'bg-gradient-to-br from-slate-900/95 via-blue-900/90 to-slate-900/95 border-blue-400/30'
+              : 'bg-gradient-to-br from-white via-blue-50 to-white border-blue-300/40'
+          }`}>
+            {/* Header with icon and status */}
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/10">
+              <div className="flex items-center gap-3">
                 {mode === 'health' ? (
                   <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-red-500/20' : 'bg-red-100'}`}>
                     <Heart className={`w-5 h-5 ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`} />
@@ -582,65 +594,77 @@ function App() {
                   {mode === 'health' ? 'Health Information' : 'Translation Result'}
                 </h3>
               </div>
-
-              {/* Original text - if available */}
-              {originalText && (
-                <div className={`mb-4 p-4 rounded-xl ${
-                  theme === 'dark' ? 'bg-white/5' : 'bg-gray-100/80'
-                }`}>
-                  <p className={`text-xs uppercase tracking-wider mb-2 font-semibold ${
-                    theme === 'dark' ? 'text-blue-400/80' : 'text-blue-600/80'
-                  }`}>
-                    Your Query
-                  </p>
-                  <p className={`text-base italic leading-relaxed ${
-                    theme === 'dark' ? 'text-white/80' : 'text-gray-700'
-                  }`}>
-                    "{originalText}"
-                  </p>
-                </div>
-              )}
-
-              {/* Main translated/response text */}
-              <div className={`p-5 rounded-xl ${
-                theme === 'dark' 
-                  ? 'bg-gradient-to-br from-blue-500/10 to-purple-500/10' 
-                  : 'bg-gradient-to-br from-blue-50 to-purple-50'
+              
+              {/* Mini status indicator */}
+              <div className={`text-xs px-3 py-1 rounded-full ${
+                isSpeaking 
+                  ? theme === 'dark' ? 'bg-green-500/20 text-green-300 animate-pulse' : 'bg-green-100 text-green-700 animate-pulse'
+                  : theme === 'dark' ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-100 text-blue-700'
               }`}>
-                <p className={`text-lg font-medium leading-relaxed whitespace-pre-line ${
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                }`} style={{ fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" }}>
-                  {translatedText}
+                {isSpeaking ? '🔊 Speaking' : '✓ Ready'}
+              </div>
+            </div>
+
+            {/* Original text - if available */}
+            {originalText && (
+              <div className={`mb-4 p-4 rounded-xl ${
+                theme === 'dark' ? 'bg-white/5' : 'bg-gray-100/80'
+              }`}>
+                <p className={`text-xs uppercase tracking-wider mb-2 font-semibold ${
+                  theme === 'dark' ? 'text-blue-400/80' : 'text-blue-600/80'
+                }`}>
+                  Your Query
+                </p>
+                <p className={`text-base italic leading-relaxed ${
+                  theme === 'dark' ? 'text-white/80' : 'text-gray-700'
+                }`}>
+                  "{originalText}"
                 </p>
               </div>
+            )}
 
-              {/* Translation method badge */}
-              {translationMethod && mode === 'translate' && (
-                <div className="mt-4 flex items-center gap-2">
+            {/* Main translated/response text */}
+            <div className={`p-5 rounded-xl ${
+              theme === 'dark' 
+                ? 'bg-gradient-to-br from-blue-500/10 to-purple-500/10' 
+                : 'bg-gradient-to-br from-blue-50 to-purple-50'
+            }`}>
+              <p className={`text-lg font-medium leading-relaxed whitespace-pre-line ${
+                theme === 'dark' ? 'text-white' : 'text-gray-900'
+              }`} style={{ fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" }}>
+                {translatedText}
+              </p>
+            </div>
+
+            {/* Translation method badge */}
+            {translationMethod && mode === 'translate' && (
+              <div className="mt-4 flex items-center gap-2">
+                <span className={`text-xs px-3 py-1 rounded-full ${
+                  theme === 'dark' 
+                    ? 'bg-green-500/20 text-green-300' 
+                    : 'bg-green-100 text-green-700'
+                }`}>
+                  Via: {translationMethod}
+                </span>
+                {detectedSource && (
                   <span className={`text-xs px-3 py-1 rounded-full ${
                     theme === 'dark' 
-                      ? 'bg-green-500/20 text-green-300' 
-                      : 'bg-green-100 text-green-700'
+                      ? 'bg-blue-500/20 text-blue-300' 
+                      : 'bg-blue-100 text-blue-700'
                   }`}>
-                    Via: {translationMethod}
+                    Detected: {detectedSource}
                   </span>
-                  {detectedSource && (
-                    <span className={`text-xs px-3 py-1 rounded-full ${
-                      theme === 'dark' 
-                        ? 'bg-blue-500/20 text-blue-300' 
-                        : 'bg-blue-100 text-blue-700'
-                    }`}>
-                      Detected: {detectedSource}
-                    </span>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
+            )}
 
+            {/* Action buttons */}
+            <div className="mt-6 flex gap-3">
               {/* Stop button when speaking */}
               {isSpeaking && (
                 <button
                   onClick={stopSpeaking}
-                  className={`mt-4 w-full py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 ${
+                  className={`flex-1 py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 ${
                     theme === 'dark'
                       ? 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-500/30'
                       : 'bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-400/40'
@@ -650,47 +674,73 @@ function App() {
                   Stop Voice
                 </button>
               )}
-
-              {/* Debug info - collapsible */}
-              {attempts.length > 0 && (
-                <details className="mt-4">
-                  <summary className={`text-xs cursor-pointer ${
-                    theme === 'dark' ? 'text-white/50 hover:text-white/70' : 'text-gray-500 hover:text-gray-700'
-                  }`}>
-                    Debug Info
-                  </summary>
-                  <div className={`mt-2 text-xs font-mono max-h-32 overflow-auto p-3 rounded-lg ${
-                    theme === 'dark' ? 'bg-black/30 text-green-400' : 'bg-gray-100 text-gray-700'
-                  }`}>
-                    {attempts.map((a,i)=>(<div key={i} className="mb-1">{a}</div>))}
-                  </div>
-                </details>
-              )}
+              
+              {/* New query button */}
+              <button
+                onClick={() => {
+                  setTranslatedText('');
+                  setOriginalText('');
+                  setHealthResponse('');
+                  stopSpeaking();
+                }}
+                className={`${isSpeaking ? 'flex-1' : 'w-full'} py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2 ${
+                  theme === 'dark'
+                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white shadow-lg shadow-cyan-500/30'
+                    : 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg shadow-blue-400/40'
+                }`}
+              >
+                <Mic className="w-5 h-5" />
+                New Query
+              </button>
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Enhanced animations */}
-  <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.7; }
-          50% { transform: translateY(-20px) rotate(180deg); opacity: 1; }
-        }
-        @keyframes floatParticle {
-          0%, 100% { transform: translateY(0px) translateX(0px); }
-          33% { transform: translateY(-30px) translateX(10px); }
-          66% { transform: translateY(-10px) translateX(-15px); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0px); }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.5s ease-out;
-        }
-  `}</style>
+            {/* Debug info - collapsible */}
+            {attempts.length > 0 && (
+              <details className="mt-4">
+                <summary className={`text-xs cursor-pointer ${
+                  theme === 'dark' ? 'text-white/50 hover:text-white/70' : 'text-gray-500 hover:text-gray-700'
+                }`}>
+                  Debug Info
+                </summary>
+                <div className={`mt-2 text-xs font-mono max-h-32 overflow-auto p-3 rounded-lg ${
+                  theme === 'dark' ? 'bg-black/30 text-green-400' : 'bg-gray-100 text-gray-700'
+                }`}>
+                  {attempts.map((a,i)=>(<div key={i} className="mb-1">{a}</div>))}
+                </div>
+              </details>
+            )}
+          </div>
+        </div>
+      )}
     </div>
+
+    {/* Enhanced animations */}
+    <style>{`
+      @keyframes float {
+        0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.7; }
+        50% { transform: translateY(-20px) rotate(180deg); opacity: 1; }
+      }
+      @keyframes floatParticle {
+        0%, 100% { transform: translateY(0px) translateX(0px); }
+        33% { transform: translateY(-30px) translateX(10px); }
+        66% { transform: translateY(-10px) translateX(-15px); }
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0px); }
+      }
+      @keyframes slideInRight {
+        from { opacity: 0; transform: translateX(50px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      .animate-fadeIn {
+        animation: fadeIn 0.5s ease-out;
+      }
+      .animate-slideInRight {
+        animation: slideInRight 0.6s ease-out;
+      }
+    `}</style>
+  </div>
   );
 }
 
