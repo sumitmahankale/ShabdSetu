@@ -265,35 +265,35 @@ class HealthLiteracyTutor:
         """
         if language == 'en':
             response = f"""
-**Health Information**
+Health Information
 
-**Symptoms:** {condition_info.get('symptoms', 'Not available')}
+Symptoms: {condition_info.get('symptoms', 'Not available')}
 
-**Common Causes:** {condition_info.get('causes', 'Not available')}
+Common Causes: {condition_info.get('causes', 'Not available')}
 
-**Home Remedies:** {condition_info.get('home_remedies', 'Not available')}
+Home Remedies: {condition_info.get('home_remedies', 'Not available')}
 
-**Medicines:** {condition_info.get('medicines', 'Not available')}
+Medicines: {condition_info.get('medicines', 'Not available')}
 
-**⚠️ Important:** {condition_info.get('warning', 'Please consult a doctor for proper diagnosis and treatment')}
+⚠️ Important: {condition_info.get('warning', 'Please consult a doctor for proper diagnosis and treatment')}
 
-**Note:** This information is for educational purposes only. Always consult a qualified healthcare professional for medical advice.
+Note: This information is for educational purposes only. Always consult a qualified healthcare professional for medical advice.
 """
         else:  # Marathi
             response = f"""
-**आरोग्य माहिती**
+आरोग्य माहिती
 
-**लक्षणे:** {condition_info.get('symptoms', 'उपलब्ध नाही')}
+लक्षणे: {condition_info.get('symptoms', 'उपलब्ध नाही')}
 
-**सामान्य कारणे:** {condition_info.get('causes', 'उपलब्ध नाही')}
+सामान्य कारणे: {condition_info.get('causes', 'उपलब्ध नाही')}
 
-**घरगुती उपाय:** {condition_info.get('home_remedies', 'उपलब्ध नाही')}
+घरगुती उपाय: {condition_info.get('home_remedies', 'उपलब्ध नाही')}
 
-**औषधे:** {condition_info.get('medicines', 'उपलब्ध नाही')}
+औषधे: {condition_info.get('medicines', 'उपलब्ध नाही')}
 
-**⚠️ महत्त्वाचे:** {condition_info.get('warning', 'योग्य निदान आणि उपचारांसाठी डॉक्टरांचा सल्ला घ्या')}
+⚠️ महत्त्वाचे: {condition_info.get('warning', 'योग्य निदान आणि उपचारांसाठी डॉक्टरांचा सल्ला घ्या')}
 
-**टीप:** ही माहिती केवळ शैक्षणिक उद्देशांसाठी आहे. वैद्यकीय सल्ल्यासाठी नेहमी पात्र आरोग्य व्यावसायिकाचा सल्ला घ्या.
+टीप: ही माहिती केवळ शैक्षणिक उद्देशांसाठी आहे. वैद्यकीय सल्ल्यासाठी नेहमी पात्र आरोग्य व्यावसायिकाचा सल्ला घ्या.
 """
         
         return response.strip()

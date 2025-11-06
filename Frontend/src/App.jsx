@@ -717,11 +717,53 @@ function App() {
                 ? 'bg-gradient-to-br from-blue-500/10 to-purple-500/10' 
                 : 'bg-gradient-to-br from-blue-50 to-purple-50'
             }`}>
-              <p className={`text-lg font-medium leading-relaxed whitespace-pre-line ${
+              <div className={`text-lg leading-relaxed ${
                 theme === 'dark' ? 'text-white' : 'text-gray-900'
               }`} style={{ fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" }}>
-                {translatedText}
-              </p>
+                {translatedText.replace(/\*\*/g, '').split('\n').map((line, index) => {
+                  // Check if line is a section header (Cause:, Symptoms:, etc.)
+                  const isSectionHeader = /^(cause|causes|symptom|symptoms|prevention|treatment|when to see|warning|note|important|description|about|overview|what is|precaution|precautions|home remedies|remedies|diagnosis|complications|risk factors|tips):/i.test(line.trim());
+                  
+                  // Check if line starts with a number or bullet point
+                  const isBulletPoint = /^[\d•\-*]\.\s|^[•\-*]\s/.test(line.trim());
+                  
+                  // Check if line contains key terms that should be emphasized
+                  const hasKeyTerms = /(fever|pain|infection|bacteria|virus|immune|severe|emergency|doctor|hospital|medication)/i.test(line);
+                  
+                  if (isSectionHeader) {
+                    return (
+                      <div key={index} className="mb-3 mt-4 first:mt-0">
+                        <h4 className={`text-xl font-bold ${
+                          theme === 'dark' 
+                            ? 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-400' 
+                            : 'text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-700'
+                        }`}>
+                          {line.trim()}
+                        </h4>
+                      </div>
+                    );
+                  } else if (isBulletPoint) {
+                    return (
+                      <div key={index} className="ml-4 mb-2">
+                        <p className={`${
+                          theme === 'dark' ? 'text-white/90' : 'text-gray-800'
+                        }`}>
+                          {line.trim()}
+                        </p>
+                      </div>
+                    );
+                  } else if (line.trim().length > 0) {
+                    return (
+                      <p key={index} className={`mb-3 ${
+                        theme === 'dark' ? 'text-white/85' : 'text-gray-800'
+                      } ${hasKeyTerms ? 'font-medium' : ''}`}>
+                        {line.trim()}
+                      </p>
+                    );
+                  }
+                  return null;
+                })}
+              </div>
             </div>
 
             {/* Translation method badge */}
